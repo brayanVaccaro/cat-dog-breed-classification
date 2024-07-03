@@ -39,7 +39,7 @@ class Trainer:
         self.model_visualizer = ModelVisualizer(self.model, dataloader_helper)
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.model.cuda(self.device)
+        self.model.to(self.device)
         self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
         self.scheduler = ExponentialLR(optimizer, gamma=0.9) if optimizer else None
         self.early_stopper = EarlyStopper(patience=3, min_delta=0.03)

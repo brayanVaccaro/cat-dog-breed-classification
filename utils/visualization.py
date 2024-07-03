@@ -17,7 +17,7 @@ class ModelVisualizer:
         self.model = model
         self.data_loader_helper = data_loader_helper
         self.device = device
-        self.model.cuda(self.device)
+        self.model.to(self.device)
         self.all_classes = data_loader_helper.index_to_class
 
     def images_to_probs(self, images):
