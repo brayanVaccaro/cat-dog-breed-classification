@@ -3,40 +3,48 @@ from matplotlib import pyplot as plt
 import numpy as np
 from torch import Tensor
 import torch.utils.data
-import torchvision.transforms as transforms
+from torchvision.transforms import v2
+
 from torchvision.datasets import OxfordIIITPet
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, Dataset
 from sklearn.model_selection import train_test_split
 
 
 class DataLoaderHelper:
-    def __init__(self, root_dir="./data"):
+    def __init__(self, config, root_dir="./data"):
         self.root_dir = root_dir
+        self.config = config
         self.annotations_file = os.path.join(
             f"{root_dir}\\oxford-iiit-pet", "annotations", "trainval.txt"
         )
         self.data_transforms = {
-            "train": transforms.Compose(
+            "train": v2.Compose(
                 [
-                    transforms.RandomResizedCrop(224),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                    v2.RandomResizedCrop(size=(224, 224)),
+                    v2.RandomHorizontalFlip(),
+                    v2.ToImage(),
+                    v2.ToDtype(torch.float32, scale=True),
+                    v2.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
                 ]
             ),
-            "val": transforms.Compose(
+            "val": v2.Compose(
                 [
-                    transforms.Resize(256),
-                    transforms.CenterCrop(224),
-                    transforms.ToTensor(),
-                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                    v2.Resize(size=(224, 224)),
+                    v2.ToDtype(torch.float32, scale=True),
+                    v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                ]
+            ),
+            "test": v2.Compose(
+                [
+                    v2.Resize(size=(224, 224)),
+                    v2.ToImage(),
+                    v2.ToDtype(torch.float32, scale=True),
                 ]
             ),
         }
 
         self.dataset = self.create_oxford_train()
         self.classes_to_idx = self.dataset.class_to_idx
-        self.index_to_class = {v: k for k, v in self.classes_to_idx.items()}
 
     def create_oxford_train(self):
         dataset = OxfordIIITPet(
@@ -45,133 +53,153 @@ class DataLoaderHelper:
         return dataset
 
     def load_data(self, selected_classes=None):
-        dataset = OxfordIIITPet(
-            root=self.root_dir, transform=self.data_transforms["train"], download=True
-        )
-
-        if selected_classes:
-            return self.filter_and_split_dataset(selected_classes)
-        else:
-            return self.split_dataset()
-
-    def filter_and_split_dataset(self, selected_classes):
-        class_to_idx = self.dataset.class_to_idx
-        selected_indices = [
-            i
-            for i, (_, label) in enumerate(self.dataset)
-            if self.dataset.classes[label] in selected_classes
-        ]
-
-        selected_targets = [self.dataset[i][1] for i in selected_indices]
-
-        # Split the dataset into training and validation sets
-        train_indices, val_indices = train_test_split(
-            selected_indices, test_size=0.2, stratify=selected_targets, random_state=42
-        )
-
-        train_dataset = Subset(self.dataset, train_indices)
-        val_dataset = Subset(self.dataset, val_indices)
-
-        # Apply the respective transformations
-        train_dataset.dataset.transform = self.data_transforms["train"]
-        val_dataset.dataset.transform = self.data_transforms["val"]
-
-        dataloaders = {
-            "train": DataLoader(
-                train_dataset, batch_size=40, shuffle=True, num_workers=4
-            ),
-            "val": DataLoader(val_dataset, batch_size=5, shuffle=False, num_workers=4),
-        }
-        dataset_sizes = {"train": len(train_dataset), "val": len(val_dataset)}
-
+        self.selected_classes = selected_classes
+        return self.filter_and_split_dataset()
+    
+    def filter_and_split_dataset(self):
+        # Crea un dizionario per mappare le classi selezionate ai nuovi indici a partire da 0
         filtered_class_to_idx = {
-            key: self.dataset.class_to_idx[key]
-            for key in selected_classes
-            if key in self.dataset.class_to_idx
+            class_name: idx for idx, class_name in enumerate(self.selected_classes)
         }
-        filtered_classes = [
-            cls for cls in self.dataset.class_to_idx.keys() if cls in selected_classes
+        class_indices = {class_name: [] for class_name in self.selected_classes}
+        # Seleziona gli indici dei dati nel dataset originale che appartengono alle classi selezionate
+        for i, (_, label) in enumerate(self.dataset):
+            class_name = self.dataset.classes[label]
+            if class_name in filtered_class_to_idx:
+                class_indices[class_name].append(i)
+
+        selected_indices = [
+            idx for indices in class_indices.values() for idx in indices
+        ]
+        updated_labels = [
+            filtered_class_to_idx[self.dataset.classes[self.dataset[idx][1]]]
+            for idx in selected_indices
         ]
 
-        for x in ["train", "val"]:
-            dataloaders[x].dataset.classes = filtered_classes
-            dataloaders[x].dataset.class_to_idx = filtered_class_to_idx
-
-        return dataloaders, dataset_sizes
-
-    def split_dataset(self):
-        targets = [label for _, label in self.dataset]
-
-        # Split the dataset into training and validation sets
+        # Divide gli indici in set di addestramento e validazione mantenendo la distribuzione delle classi
         train_indices, val_indices = train_test_split(
-            range(len(self.dataset)), test_size=0.25, stratify=targets, random_state=42
+            selected_indices, test_size=0.2, stratify=updated_labels, random_state=42
         )
+        # Estrae le etichette aggiornate per i subset di training e validation
+        train_labels = [
+            updated_labels[selected_indices.index(i)] for i in train_indices
+        ]
+        val_labels = [updated_labels[selected_indices.index(i)] for i in val_indices]
 
-        train_dataset = Subset(self.dataset, train_indices)
-        val_dataset = Subset(self.dataset, val_indices)
+        self.print_class_distribution(train_indices, train_labels, "Train")
+        self.print_class_distribution(val_indices, val_labels, "Validation")
+
+        # Crea i subset di training e validation usando la classe FilteredDataset
+        train_dataset = FilteredDataset(self.dataset, train_indices, train_labels)
+        val_dataset = FilteredDataset(self.dataset, val_indices, val_labels)
 
         # Apply the respective transformations
-        train_dataset.dataset.transform = self.data_transforms["train"]
-        val_dataset.dataset.transform = self.data_transforms["val"]
+        train_dataset.original_dataset.transform = self.data_transforms["train"]
+        val_dataset.original_dataset.transform = self.data_transforms["val"]
 
         dataloaders = {
             "train": DataLoader(
-                train_dataset, batch_size=46, shuffle=True, num_workers=4
+                train_dataset,
+                batch_size=self.config["batch_size_t"],
+                shuffle=True,
+                num_workers=4,
             ),
-            "val": DataLoader(val_dataset, batch_size=20, shuffle=False, num_workers=4),
+            "val": DataLoader(
+                val_dataset,
+                batch_size=self.config["batch_size_v"],
+                shuffle=False,
+                num_workers=4,
+            ),
         }
         dataset_sizes = {"train": len(train_dataset), "val": len(val_dataset)}
 
+        assert all(
+            0 <= label < len(self.selected_classes) for label in updated_labels
+        ), "Some labels are out of the expected range!"
+        # self.display_all_images(dataloaders["val"])
         return dataloaders, dataset_sizes
+
+    def print_class_distribution(self, indices, labels, dataset_type="Train"):
+        from collections import Counter
+
+        label_counts = Counter(labels)
+        print(f"{dataset_type} dataset distribution:")
+        for class_idx, count in label_counts.items():
+            class_name = [
+                name
+                for idx, name in enumerate(self.selected_classes)
+                if idx == class_idx
+            ]
+            print(f"Class {class_name} (index {class_idx}): {count} images")
 
     def load_test_data(self, selected_classes):
+        self.selected_classes = selected_classes
         dataset = OxfordIIITPet(
             root=self.root_dir,
             split="test",
-            transform=self.data_transforms["val"],
+            transform=self.data_transforms["test"],
             download=True,
         )
+        
+        # Crea un dizionario per mappare le classi selezionate ai nuovi indici a partire da 0
+        filtered_class_to_idx = {
+            class_name: idx for idx, class_name in enumerate(self.selected_classes)
+        }
 
-        if selected_classes:
-            class_to_idx = dataset.class_to_idx
-            selected_indices = [
-                i
-                for i, (_, label) in enumerate(dataset)
-                if dataset.classes[label] in selected_classes
-            ]
+        class_indices = {class_name: [] for class_name in self.selected_classes}
 
-            test_dataset = Subset(dataset, selected_indices)
-        else:
-            test_dataset = dataset
+        for i, (_, label) in enumerate(dataset):
+            class_name = dataset.classes[label]
+            if class_name in filtered_class_to_idx:
+                class_indices[class_name].append(i)
+
+        selected_indices = [
+            idx for indices in class_indices.values() for idx in indices
+        ]
+        updated_labels = [
+            filtered_class_to_idx[dataset.classes[dataset[idx][1]]]
+            for idx in selected_indices
+        ]
+        test_labels = [
+            updated_labels[selected_indices.index(i)] for i in selected_indices
+        ]
+        if not selected_indices:
+            print(
+                "Nessun indice trovato per le classi selezionate. Verifica le classi."
+            )
+            return None, 0
+
+        self.print_class_distribution(selected_indices, test_labels, "Test")
+
+        test_dataset = FilteredDataset(dataset, selected_indices, test_labels)
+        test_dataset.original_dataset.transform = self.data_transforms["test"]
 
         dataloader = DataLoader(
-            test_dataset, batch_size=40, shuffle=False, num_workers=4
+            test_dataset,
+            batch_size=self.config["batch_size_t"],
+            shuffle=True,
+            num_workers=4,
         )
+        # self.display_all_images(dataloader) #DEBUG
         return dataloader, len(test_dataset)
 
-    def matplotlib_imshow(self, img: Tensor, one_channel):
-        if one_channel:
-            img = img.mean(
-                dim=0
-            )  # Converte l'immagine a scala di grigi facendo la media sui canali
-        else:
-            # Denormalizza l'immagine
-            mean = np.array([0.485, 0.456, 0.406])
-            std = np.array([0.229, 0.224, 0.225])
-            img = (
-                img.cpu() * std[:, None, None] + mean[:, None, None]
-            )  # Applica la denormalizzazione su ciascun canale
+    def matplotlib_imshow(self, img: Tensor):
+
+        # Denormalizza l'immagine
+        mean = np.array([0.485, 0.456, 0.406])
+        std = np.array([0.229, 0.224, 0.225])
+        img = (
+            img.cpu() * std[:, None, None] + mean[:, None, None]
+        )  # Applica la denormalizzazione su ciascun canale
 
         npimg = img.numpy()
-        if one_channel:
-            plt.imshow(npimg, cmap="Greys")
-        else:
-            npimg = np.clip(
-                npimg, 0, 1
-            )  # Clipping dei valori per essere nell'intervallo corretto
-            plt.imshow(
-                np.transpose(npimg, (1, 2, 0))
-            )  # Trasposizione per convertire l'immagine da (C, H, W) a (H, W, C)
+
+        npimg = np.clip(
+            npimg, 0, 1
+        )  # Clipping dei valori per essere nell'intervallo corretto
+        plt.imshow(
+            np.transpose(npimg, (1, 2, 0))
+        )  # Trasposizione per convertire l'immagine da (C, H, W) a (H, W, C)
 
     def breeds(self):
         cat_data = []
@@ -196,3 +224,22 @@ class DataLoaderHelper:
         }
 
         return dog_breeds, cat_breeds
+
+
+# Creazione di un nuovo dataset filtrato con etichette aggiornate
+class FilteredDataset(Dataset):
+    def __init__(self, original_dataset, selected_indices, updated_labels):
+        self.original_dataset = original_dataset
+        self.selected_indices = selected_indices
+        self.updated_labels = updated_labels
+
+    def __len__(self):
+        return len(self.selected_indices)
+
+    def __getitem__(self, idx):
+        # Estrae i dati dall'indice originale e sostituisce l'etichetta con quella aggiornata
+        original_idx = self.selected_indices[idx]
+        data, _ = self.original_dataset[original_idx]
+        label = self.updated_labels[idx]
+        return data, label
+
