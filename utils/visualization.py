@@ -18,7 +18,6 @@ class ModelVisualizer:
         self.data_loader_helper = data_loader_helper
         self.device = device
         self.model.to(self.device)
-        self.all_classes = data_loader_helper.index_to_class
 
     def images_to_probs(self, images):
         """
@@ -31,7 +30,7 @@ class ModelVisualizer:
         preds = np.squeeze(preds_tensor.cpu().numpy())
         return preds, [F.softmax(el, dim=0)[i].item() for i, el in zip(preds, output)]
 
-    def plot_classes_preds(self, images, labels, selected_classes=None):
+    def plot_classes_preds(self, images, labels, selected_classes=None, num_images= 5):
         """
         Generates matplotlib Figure using a trained network, along with images
         and labels from a batch, that shows the network's top prediction along
@@ -43,16 +42,18 @@ class ModelVisualizer:
 
         preds, probs = self.images_to_probs(images)
 
-        fig = plt.figure(figsize=(10, 10))
-        for idx in range(4):
-            ax = fig.add_subplot(1, 4, idx + 1, xticks=[], yticks=[])
-            self.data_loader_helper.matplotlib_imshow(images[idx], one_channel=False)
+        fig = plt.figure(figsize=(15, 5))
+        
+        for idx in range(num_images):
+            ax = fig.add_subplot(1, num_images, idx + 1, xticks=[], yticks=[])
+            self.data_loader_helper.matplotlib_imshow(images[idx])
             ax.set_title(
                 "{0}, {1:.1f}%\n(label: {2})".format(
-                    self.all_classes[preds[idx]],
+                    classes[preds[idx]],
                     probs[idx] * 100.0,
                     classes[labels[idx].item()],
                 ),
                 color=("green" if preds[idx] == labels[idx].item() else "red"),
             )
+        plt.subplots_adjust(wspace=2.5)  # Aumenta lo spazio tra le immagini
         return fig

@@ -1,3 +1,4 @@
+import json
 import tkinter as tk
 from tkinter import Frame, messagebox, scrolledtext
 import threading
@@ -13,8 +14,12 @@ class App:
     def __init__(self, root):
         self.root = root
         root.title("Class Selector for OxfordIIITPet Dataset")
+        # Parametri dal file config.json
+        with open("config.json", "r") as f:
+            self.config = json.load(f)
+
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.data_loader = DataLoaderHelper(root_dir="./data")
+        self.data_loader = DataLoaderHelper(self.config, root_dir="./data")
         self.model_factory = ModelFactory(device=self.device)
 
         self.dog_classes, self.cat_classes = self.data_loader.breeds()
@@ -23,7 +28,6 @@ class App:
         self.testing_thread = None
         self.trained_model = None
         self.selected_classes = []
-        self.index_to_class = {}
 
         # Caricamento delle classi del dataset
         self.classes = self.data_loader.classes_to_idx
@@ -102,15 +106,34 @@ class App:
             (0, 0), window=self.scrollable_class_frame, anchor="nw"
         )
         self.class_canvas.configure(yscrollcommand=self.scrollbar.set)
+        # Abilita lo scorrimento con la rotellina del mouse
+        self.class_canvas.bind(
+            "<MouseWheel>",
+            lambda event: self.class_canvas.yview_scroll(
+                int(-1 * (event.delta / 120)), "units"
+            ),
+        )
+
         self.class_canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
 
-        # Creazione dei checkbox per la selezione delle classi
-        self.checkboxes = []
-        self.class_vars = []
         tk.Label(
             self.scrollable_class_frame, text="Dog Breeds", font=("Helvetica", 18)
         ).pack()
+        # Checkbox per selezionare tutte le classi
+        self.select_all_var = tk.BooleanVar()
+        self.select_all_checkbox = tk.Checkbutton(
+            self.scrollable_class_frame,
+            text="Select All",
+            variable=self.select_all_var,
+            command=self.toggle_all_classes,
+            font=("Helvetica", 16),
+        )
+        self.select_all_checkbox.pack(anchor="w")
+        # Creazione dei checkbox per la selezione delle classi
+        self.checkboxes = []
+        self.class_vars = []
+
         for cls in self.classes:
             var = tk.BooleanVar()
             cb = tk.Checkbutton(
@@ -126,6 +149,11 @@ class App:
 
         # Pulsanti per iniziare e fermare il training
         self.setup_buttons()
+
+    def toggle_all_classes(self):
+        """Toggle the state of all class checkboxes based on the 'Select All' checkbox."""
+        for var in self.class_vars:
+            var.set(self.select_all_var.get())
 
     def setup_buttons(self):
         """Setup the start and stop training buttons."""
@@ -156,13 +184,10 @@ class App:
         self.selected_classes = [
             cls for var, cls in zip(self.class_vars, self.classes) if var.get()
         ]
-        self.index_to_class = {self.classes[cls]: cls for cls in self.selected_classes}
         if not self.selected_classes:
-            self.selected_classes = [
-                cls for var, cls in zip(self.class_vars, self.classes)
-            ]
-            # return
-        print("Selected indices:", self.index_to_class)
+            messagebox.showerror("Error", "No classes selected")
+            return
+        print("Selected classes:", self.selected_classes)
         self.train_button.config(state=tk.DISABLED)
         # self.stop_button.config(state=tk.NORMAL)
         self.training_thread = threading.Thread(target=self.train_model, daemon=True)
@@ -172,22 +197,23 @@ class App:
         # Preparazione per il training
         self.update_log(
             "Training started with selected classes... ({})".format(
-                self.index_to_class.values()
+                self.selected_classes
             )
         )
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+        
         (train_loader, train_loader_sizes) = self.data_loader.load_data(
             self.selected_classes
         )
+        
+        self.update_log(f"SIZES:\ntrain -> {train_loader_sizes['train']}, batch_size={train_loader['train'].batch_size}\nval -> {train_loader_sizes['val']}, batch_size={train_loader['val'].batch_size}\n")
 
-        n_classes = len(self.index_to_class) if len(self.index_to_class) > 0 else 12
+        n_classes = len(self.selected_classes)
 
         # Utilizzo di ModelFactory per creare il modello
 
         model = self.model_factory.get_resnet50(n_classes)
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.config["optimizer_lr"])
 
         # Creazione di un'istanza di Trainer e inizio del training
         trainer = Trainer(
@@ -195,8 +221,9 @@ class App:
             train_loader,
             train_loader_sizes,
             optimizer,
-            self.index_to_class,
+            self.selected_classes,
             self.update_log,
+            self.config,
         )
         self.trained_model = trainer.train()
 
@@ -215,6 +242,9 @@ class App:
         self.testing_thread.start()
 
     def test_model(self):
+        self.selected_classes = [
+            cls for var, cls in zip(self.class_vars, self.classes) if var.get()
+        ]
         """Test the trained model."""
         if messagebox.askyesno(
             "Model not found",
@@ -240,18 +270,18 @@ class App:
 
         self.update_log(
             "Testing started with selected classes... ({})".format(
-                self.index_to_class.values()
+                self.selected_classes
             )
         )
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        
         train_loader, train_loader_size = self.data_loader.load_test_data(
             self.selected_classes
         )
-
+        
         model = self.trained_model
 
         trainer = Trainer(
-            model, None, None, None, self.selected_classes, self.update_log
+            model, None, None, None, self.selected_classes, self.update_log, self.config
         )
 
         accuracy, all_preds, all_labels = trainer.test(train_loader)
@@ -262,7 +292,7 @@ class App:
     def load_model(self, model_path):
         device = self.device
 
-        n_classes = len(self.index_to_class) if len(self.index_to_class) > 0 else 37
+        n_classes = len(self.selected_classes)
         model = self.model_factory.get_resnet50(n_classes)
         model.load_state_dict(torch.load(model_path))
         model.to(device)

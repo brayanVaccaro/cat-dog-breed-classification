@@ -1,0 +1,11 @@
+{
+    "optimizer_lr": 0.0001,
+    
+    "epochs_t_v": 50,
+    "batch_size_t": 40,
+    "batch_size_v": 5,
+    "test_size": 0.25,
+
+    "early_stopping_patience": 3,
+    "early_stopping_min_delta": 0.03
+}

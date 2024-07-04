@@ -24,6 +24,7 @@ class Trainer:
         optimizer,
         selected_classes,
         log_function,
+        config,
         save_dir="./model_weights",
     ):
         """
@@ -35,14 +36,16 @@ class Trainer:
         self.optimizer = optimizer
         self.selected_classes = selected_classes
         self.log_function = log_function
-        dataloader_helper = DataLoaderHelper()
+        self.config = config
+
+        dataloader_helper = DataLoaderHelper(self.config)
         self.model_visualizer = ModelVisualizer(self.model, dataloader_helper)
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
         self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
         self.scheduler = ExponentialLR(optimizer, gamma=0.9) if optimizer else None
-        self.early_stopper = EarlyStopper(patience=3, min_delta=0.03)
+        self.early_stopper = EarlyStopper(patience=self.config['early_stopping_patience'], min_delta=self.config['early_stopping_min_delta'])
         self.writer = SummaryWriter()
         self.save_dir = save_dir
         self.global_step = 0
@@ -59,11 +62,11 @@ class Trainer:
 
         best_model_params_path = os.path.join(self.save_dir, "best_model_params.pt")
         should_stop = False
-
+        
         # Save the initial model parameters
         torch.save(self.model.state_dict(), best_model_params_path)
 
-        for epoch in range(50):
+        for epoch in range(self.config['epochs_t_v']):
             if should_stop:
                 break
             print(f"\nEpoch {epoch}/{50 - 1}")
@@ -162,7 +165,7 @@ class Trainer:
             with torch.no_grad():
                 outputs = self.model(inputs)
                 _, preds = torch.max(outputs, 1)
-
+                
             running_corrects += torch.sum(preds == labels.data)
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
