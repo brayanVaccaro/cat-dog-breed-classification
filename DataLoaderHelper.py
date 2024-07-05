@@ -15,7 +15,7 @@ class DataLoaderHelper:
         self.root_dir = root_dir
         self.config = config
         self.annotations_file = os.path.join(
-            f"{root_dir}\\oxford-iiit-pet", "annotations", "trainval.txt"
+            root_dir, "oxford-iiit-pet", "annotations", "trainval.txt"
         )
         self.data_transforms = {
             "train": v2.Compose(
@@ -47,55 +47,32 @@ class DataLoaderHelper:
         self.classes_to_idx = self.dataset.class_to_idx
 
     def create_oxford_train(self):
-        dataset = OxfordIIITPet(
+        return OxfordIIITPet(
             root=self.root_dir, transform=self.data_transforms["train"], download=True
         )
-        return dataset
 
     def load_data(self, selected_classes=None):
         self.selected_classes = selected_classes
         return self.filter_and_split_dataset()
-    
+
     def filter_and_split_dataset(self):
-        # Crea un dizionario per mappare le classi selezionate ai nuovi indici a partire da 0
-        filtered_class_to_idx = {
-            class_name: idx for idx, class_name in enumerate(self.selected_classes)
-        }
-        class_indices = {class_name: [] for class_name in self.selected_classes}
-        # Seleziona gli indici dei dati nel dataset originale che appartengono alle classi selezionate
-        for i, (_, label) in enumerate(self.dataset):
-            class_name = self.dataset.classes[label]
-            if class_name in filtered_class_to_idx:
-                class_indices[class_name].append(i)
-
-        selected_indices = [
-            idx for indices in class_indices.values() for idx in indices
-        ]
-        updated_labels = [
-            filtered_class_to_idx[self.dataset.classes[self.dataset[idx][1]]]
-            for idx in selected_indices
-        ]
-
-        # Divide gli indici in set di addestramento e validazione mantenendo la distribuzione delle classi
-        train_indices, val_indices = train_test_split(
-            selected_indices, test_size=0.2, stratify=updated_labels, random_state=42
+        filtered_class_to_idx, selected_indices, updated_labels = self.filter_dataset(
+            self.dataset
         )
-        # Estrae le etichette aggiornate per i subset di training e validation
-        train_labels = [
-            updated_labels[selected_indices.index(i)] for i in train_indices
-        ]
-        val_labels = [updated_labels[selected_indices.index(i)] for i in val_indices]
+
+        train_indices, val_indices, train_labels, val_labels = self.split_dataset(
+            selected_indices, updated_labels
+        )
 
         self.print_class_distribution(train_indices, train_labels, "Train")
         self.print_class_distribution(val_indices, val_labels, "Validation")
 
-        # Crea i subset di training e validation usando la classe FilteredDataset
-        train_dataset = FilteredDataset(self.dataset, train_indices, train_labels)
-        val_dataset = FilteredDataset(self.dataset, val_indices, val_labels)
-
-        # Apply the respective transformations
-        train_dataset.original_dataset.transform = self.data_transforms["train"]
-        val_dataset.original_dataset.transform = self.data_transforms["val"]
+        train_dataset = FilteredDataset(
+            self.dataset, train_indices, train_labels, self.data_transforms["train"]
+        )
+        val_dataset = FilteredDataset(
+            self.dataset, val_indices, val_labels, self.data_transforms["val"]
+        )
 
         dataloaders = {
             "train": DataLoader(
@@ -113,11 +90,46 @@ class DataLoaderHelper:
         }
         dataset_sizes = {"train": len(train_dataset), "val": len(val_dataset)}
 
+        return dataloaders, dataset_sizes
+
+    def filter_dataset(self, dataset: OxfordIIITPet):
+        filtered_class_to_idx = {
+            class_name: idx for idx, class_name in enumerate(self.selected_classes)
+        }
+
+        class_indices = {class_name: [] for class_name in self.selected_classes}
+
+        for i, (_, label) in enumerate(dataset):
+            class_name = dataset.classes[label]
+            if class_name in filtered_class_to_idx:
+                class_indices[class_name].append(i)
+
+        selected_indices = [
+            idx for indices in class_indices.values() for idx in indices
+        ]
+        updated_labels = [
+            filtered_class_to_idx[dataset.classes[dataset[idx][1]]]
+            for idx in selected_indices
+        ]
+
         assert all(
             0 <= label < len(self.selected_classes) for label in updated_labels
         ), "Some labels are out of the expected range!"
-        # self.display_all_images(dataloaders["val"])
-        return dataloaders, dataset_sizes
+
+        return filtered_class_to_idx, selected_indices, updated_labels
+
+    def split_dataset(self, selected_indices, updated_labels):
+
+        train_indices, val_indices = train_test_split(
+            selected_indices, test_size=0.2, stratify=updated_labels, random_state=42
+        )
+
+        train_labels = [
+            updated_labels[selected_indices.index(i)] for i in train_indices
+        ]
+        val_labels = [updated_labels[selected_indices.index(i)] for i in val_indices]
+
+        return train_indices, val_indices, train_labels, val_labels
 
     def print_class_distribution(self, indices, labels, dataset_type="Train"):
         from collections import Counter
@@ -140,40 +152,20 @@ class DataLoaderHelper:
             transform=self.data_transforms["test"],
             download=True,
         )
-        
-        # Crea un dizionario per mappare le classi selezionate ai nuovi indici a partire da 0
-        filtered_class_to_idx = {
-            class_name: idx for idx, class_name in enumerate(self.selected_classes)
-        }
 
-        class_indices = {class_name: [] for class_name in self.selected_classes}
+        filtered_class_to_idx, selected_indices, updated_labels = self.filter_dataset(
+            dataset
+        )
 
-        for i, (_, label) in enumerate(dataset):
-            class_name = dataset.classes[label]
-            if class_name in filtered_class_to_idx:
-                class_indices[class_name].append(i)
-
-        selected_indices = [
-            idx for indices in class_indices.values() for idx in indices
-        ]
-        updated_labels = [
-            filtered_class_to_idx[dataset.classes[dataset[idx][1]]]
-            for idx in selected_indices
-        ]
         test_labels = [
             updated_labels[selected_indices.index(i)] for i in selected_indices
         ]
-        if not selected_indices:
-            print(
-                "Nessun indice trovato per le classi selezionate. Verifica le classi."
-            )
-            return None, 0
 
         self.print_class_distribution(selected_indices, test_labels, "Test")
 
-        test_dataset = FilteredDataset(dataset, selected_indices, test_labels)
-        test_dataset.original_dataset.transform = self.data_transforms["test"]
-
+        test_dataset = FilteredDataset(
+            dataset, selected_indices, test_labels, self.data_transforms["test"]
+        )
         dataloader = DataLoader(
             test_dataset,
             batch_size=self.config["batch_size_t"],
@@ -191,15 +183,11 @@ class DataLoaderHelper:
         img = (
             img.cpu() * std[:, None, None] + mean[:, None, None]
         )  # Applica la denormalizzazione su ciascun canale
-
         npimg = img.numpy()
-
-        npimg = np.clip(
-            npimg, 0, 1
-        )  # Clipping dei valori per essere nell'intervallo corretto
-        plt.imshow(
-            np.transpose(npimg, (1, 2, 0))
-        )  # Trasposizione per convertire l'immagine da (C, H, W) a (H, W, C)
+        # Clipping dei valori per essere nell'intervallo corretto
+        npimg = np.clip(npimg, 0, 1)
+        # Trasposizione per convertire l'immagine da (C, H, W) a (H, W,
+        plt.imshow(np.transpose(npimg, (1, 2, 0)))
 
     def breeds(self):
         cat_data = []
@@ -228,10 +216,13 @@ class DataLoaderHelper:
 
 # Creazione di un nuovo dataset filtrato con etichette aggiornate
 class FilteredDataset(Dataset):
-    def __init__(self, original_dataset, selected_indices, updated_labels):
+    def __init__(
+        self, original_dataset, selected_indices, updated_labels, transform=None
+    ):
         self.original_dataset = original_dataset
         self.selected_indices = selected_indices
         self.updated_labels = updated_labels
+        self.transform = transform
 
     def __len__(self):
         return len(self.selected_indices)
@@ -241,5 +232,6 @@ class FilteredDataset(Dataset):
         original_idx = self.selected_indices[idx]
         data, _ = self.original_dataset[original_idx]
         label = self.updated_labels[idx]
+        if self.transform:
+            data = self.transform(data)
         return data, label
-
