@@ -8,6 +8,7 @@ from DataLoaderHelper import DataLoaderHelper
 from model_factory import ModelFactory
 from trainer import Trainer
 from sklearn.metrics import classification_report, confusion_matrix
+from training_manager import TrainingManager
 
 
 class App:
@@ -24,14 +25,13 @@ class App:
 
         self.dog_classes, self.cat_classes = self.data_loader.breeds()
         self.selected_animal_type = None
-        self.training_thread = None
-        self.testing_thread = None
-        self.trained_model = None
         self.selected_classes = []
-        self.available_models = {0: 'Resnet50', 1: 'AlexNet'}
-
+        self.available_models = {0: "Resnet50", 1: "AlexNet"}
         # Caricamento delle classi del dataset
         self.classes = self.data_loader.classes_to_idx
+        self.training_manager = TrainingManager(
+            self.config, self.update_log, self.data_loader, self.model_factory
+        )
 
         # Costruzione dell'interfaccia utente con Tkinter
         self.setup_ui()
@@ -162,7 +162,9 @@ class App:
         self.button_frame.pack(side="bottom", fill="both", expand=False)
 
         self.train_button = tk.Button(
-            self.button_frame, text="Start Training", command=self.open_model_choice_dialog
+            self.button_frame,
+            text="Start Training",
+            command=lambda: self.open_model_choice_dialog("Train"),
         )
         self.train_button.pack(side="left", padx=10, pady=10)
 
@@ -173,7 +175,9 @@ class App:
         # self.stop_button.config(state=tk.DISABLED)
 
         self.test_button = tk.Button(
-            self.button_frame, text="Test Model", command=self.start_testing_thread
+            self.button_frame,
+            text="Test Model",
+            command=lambda: self.open_model_choice_dialog("Test"),
         )
         self.test_button.config(
             state=tk.NORMAL
@@ -185,125 +189,25 @@ class App:
         self.selected_classes = [
             cls for var, cls in zip(self.class_vars, self.classes) if var.get()
         ]
-        if not self.selected_classes:
-            messagebox.showerror("Error", "No classes selected")
-            return
-        print("Selected classes:", self.selected_classes)
         self.train_button.config(state=tk.DISABLED)
         # self.stop_button.config(state=tk.NORMAL)
-        self.training_thread = threading.Thread(target=self.train_model, daemon=True)
-        self.training_thread.start()
-
-    def train_model(self):
-        # Preparazione per il training
-        self.update_log(
-            "Training started with selected classes... ({})".format(
-                self.selected_classes
-            )
+        self.training_manager.start_training_thread(
+            self.selected_classes, self.selected_model_type
         )
-        
-        (train_loader, train_loader_sizes) = self.data_loader.load_data(
-            self.selected_classes
-        )
-        
-        self.update_log(f"SIZES:\ntrain -> {train_loader_sizes['train']}, batch_size={train_loader['train'].batch_size}\nval -> {train_loader_sizes['val']}, batch_size={train_loader['val'].batch_size}\n")
-
-        n_classes = len(self.selected_classes)
-
-        # Utilizzo di ModelFactory per creare il modello
-
-        if self.selected_model_type == "ResNet50":
-            model = self.model_factory.get_resnet50(len(self.selected_classes))
-        elif self.selected_model_type == "AlexNet":
-            model = self.model_factory.get_alexnet(len(self.selected_classes))
-
-        optimizer = torch.optim.Adam(model.parameters(), lr=self.config["optimizer_lr"])
-
-        # Creazione di un'istanza di Trainer e inizio del training
-        trainer = Trainer(
-            model,
-            train_loader,
-            train_loader_sizes,
-            optimizer,
-            self.selected_classes,
-            self.update_log,
-            self.config,
-        )
-        self.trained_model = trainer.train()
-
-        self.update_log("Training completed.")
         self.train_button.config(state=tk.NORMAL)
         self.test_button.config(state=tk.NORMAL)
         # self.stop_button.config(state=tk.DISABLED)
 
     def start_testing_thread(self):
-        """Start the testing in a separate thread."""
-        self.test_button.config(state=tk.DISABLED)
-        self.train_button.config(state=tk.DISABLED)
-        # self.stop_button.config(state=tk.DISABLED)
-        self.testing_thread = threading.Thread(target=self.test_model, daemon=True)
-
-        self.testing_thread.start()
-
-    def test_model(self):
         self.selected_classes = [
             cls for var, cls in zip(self.class_vars, self.classes) if var.get()
         ]
-        """Test the trained model."""
-        if messagebox.askyesno(
-            "Model not found",
-            "No trained model found. Do you want to load a saved model?",
-        ):
-            model_path = filedialog.askopenfilename(
-                filetypes=[("PyTorch models", "*.pt")]
-            )
-            if model_path:
-                self.load_model(model_path)
-            else:
-                self.update_log("Model loading cancelled.")
-                self.test_button.config(state=tk.NORMAL)
-                self.train_button.config(state=tk.NORMAL)
-                return
-        else:
-            self.update_log("Please train the model first.")
-            self.test_button.config(state=tk.NORMAL)
-            self.train_button.config(state=tk.NORMAL)
-            return
-        if not self.selected_classes:
-            self.selected_classes = [
-                cls for var, cls in zip(self.class_vars, self.classes)
-            ]
-
-        self.update_log(
-            "Testing started with selected classes... ({})".format(
-                self.selected_classes
-            )
+        self.test_button.config(state=tk.DISABLED)
+        self.train_button.config(state=tk.DISABLED)
+        # self.stop_button.config(state=tk.DISABLED)
+        self.training_manager.start_testing_thread(
+            self.selected_classes, self.selected_model_type
         )
-        
-        train_loader, train_loader_size = self.data_loader.load_test_data(
-            self.selected_classes
-        )
-        
-        model = self.trained_model
-
-        trainer = Trainer(
-            model, None, None, None, self.selected_classes, self.update_log, self.config
-        )
-
-        accuracy, all_preds, all_labels = trainer.test(train_loader)
-
-        self.update_log(f"Test Accuracy: {accuracy:.4f}")
-        self.test_button.config(state=tk.NORMAL)
-
-    def load_model(self, model_path):
-        device = self.device
-
-        n_classes = len(self.selected_classes)
-        model = self.model_factory.get_resnet50(n_classes)
-        model.load_state_dict(torch.load(model_path))
-        model.to(device)
-        self.trained_model = model
-        self.update_log(f"Model loaded from {model_path}")
 
     def update_log(self, message):
         """Update the log area in the UI with a new message."""
@@ -311,25 +215,33 @@ class App:
         self.log_area.insert(tk.END, message + "\n")
         self.log_area.config(state="disabled")
 
-
-    def open_model_choice_dialog(self):
+    def open_model_choice_dialog(self, phase):
         """Open a dialog for model selection."""
         self.model_dialog = tk.Toplevel(self.root)
         self.model_dialog.title("Select Model Type")
         self.model_dialog.geometry("300x200")  # Dimensione della finestra
+        self.phase = phase
         
         # Impedisce interazioni con la finestra principale
         self.model_dialog.grab_set() 
 
-        tk.Label(self.model_dialog, text="Select Model Type", font=("Helvetica", 18)).pack(pady=20)
+        tk.Label(
+            self.model_dialog, text="Select Model Type", font=("Helvetica", 18)
+        ).pack(pady=20)
 
         self.resnet_button = tk.Button(
-            self.model_dialog, text=f"{self.available_models.get(0)}", command=lambda: self.choose_model(f"{self.available_models.get(1)}"), font=("Helvetica", 16)
+            self.model_dialog,
+            text="ResNet50",
+            command=lambda: self.choose_model("ResNet50"),
+            font=("Helvetica", 16),
         )
         self.resnet_button.pack(side="left", padx=20, pady=20)
 
         self.alexnet_button = tk.Button(
-            self.model_dialog, text="AlexNet", command=lambda: self.choose_model("AlexNet"), font=("Helvetica", 16)
+            self.model_dialog,
+            text="AlexNet",
+            command=lambda: self.choose_model("AlexNet"),
+            font=("Helvetica", 16),
         )
         self.alexnet_button.pack(side="right", padx=20, pady=20)
         # Attesa che la finestra di dialogo venga chiusa per continuare l'esecuzione
@@ -340,7 +252,10 @@ class App:
         """Set the selected model type, close the dialog, and start training."""
         self.selected_model_type = model_type
         self.model_dialog.destroy()  # Chiude la finestra di dialogo
-        self.start_training_thread()
+        if self.phase == "Train":
+            self.start_training_thread()
+        else:
+            self.start_testing_thread()
 
 
 if __name__ == "__main__":
