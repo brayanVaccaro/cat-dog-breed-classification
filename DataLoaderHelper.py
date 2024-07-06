@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 
 
 class DataLoaderHelper:
-    def __init__(self, config, root_dir="./data"):
+    def __init__(self, config = None, root_dir="./data"):
         self.root_dir = root_dir
         self.config = config
         self.annotations_file = os.path.join(
@@ -39,6 +39,7 @@ class DataLoaderHelper:
                     v2.Resize(size=(224, 224)),
                     v2.ToImage(),
                     v2.ToDtype(torch.float32, scale=True),
+                    v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                 ]
             ),
         }

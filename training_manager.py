@@ -3,6 +3,7 @@ import torch
 from tkinter import messagebox, filedialog
 from DataLoaderHelper import DataLoaderHelper
 from model_factory import ModelFactory
+from tester import Tester
 from trainer import Trainer
 
 
@@ -85,17 +86,15 @@ class TrainingManager:
             self.selected_classes
         )
 
-        trainer = Trainer(
+        tester = Tester(
             self.trained_model,
-            None,
-            None,
-            None,
+            test_loader,
             self.selected_classes,
+            self.device,
             self.update_log,
-            self.config,
         )
 
-        accuracy, all_preds, all_labels = trainer.test(test_loader)
+        accuracy, all_preds, all_labels = tester.test()
         self.update_log(f"Test Accuracy: {accuracy:.4f}")
 
     def load_model(self, model_path=""):
