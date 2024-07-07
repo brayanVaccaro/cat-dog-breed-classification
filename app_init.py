@@ -192,7 +192,7 @@ class App:
         self.train_button.config(state=tk.DISABLED)
         # self.stop_button.config(state=tk.NORMAL)
         self.training_manager.start_training_thread(
-            self.selected_classes, self.selected_model_type
+            self.selected_classes, self.selected_model_type, self.selected_animal_type
         )
         self.train_button.config(state=tk.NORMAL)
         self.test_button.config(state=tk.NORMAL)

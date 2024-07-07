@@ -8,7 +8,7 @@ from trainer import Trainer
 
 
 class TrainingManager:
-    def __init__(self, config, update_log, data_loader, model_factory: ModelFactory):
+    def __init__(self, config, update_log, data_loader: DataLoaderHelper, model_factory: ModelFactory):
         self.config = config
         self.update_log = update_log
         self.data_loader = data_loader
@@ -53,6 +53,8 @@ class TrainingManager:
             self.selected_classes,
             self.update_log,
             self.config,
+            self.selected_animal_type,
+            self.selected_model_type,
         )
         self.trained_model = trainer.train()
 
@@ -113,9 +115,10 @@ class TrainingManager:
         
         return model
 
-    def start_training_thread(self, selected_classes, selected_model_type):
+    def start_training_thread(self, selected_classes, selected_model_type, selected_animal_type):
         self.selected_classes = selected_classes
         self.selected_model_type = selected_model_type
+        self.selected_animal_type = selected_animal_type
         self.phase = "Train"
         if not self.selected_classes:
             messagebox.showerror("Error", "No classes selected")
