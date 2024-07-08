@@ -58,8 +58,10 @@ class Trainer:
         self.selected_animal_type = selected_animal_type
         self.selected_model_type = selected_model_type
 
-        if not os.path.exists(self.save_dir):
-            os.makedirs(self.save_dir)
+        # Add model graph to TensorBoard
+        dummy_input = torch.randn(1, 3, 224, 224).to(self.device)
+        self.writer.add_graph(self.model, dummy_input)
+        self.writer.flush()
 
     def train(self):
         """
