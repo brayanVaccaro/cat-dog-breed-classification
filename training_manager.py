@@ -1,3 +1,4 @@
+import os
 import threading
 import torch
 from tkinter import messagebox, filedialog
@@ -21,7 +22,7 @@ class TrainingManager:
         self.selected_model_type = None
         self.selected_classes = []
 
-    def train_model(self):
+    def train_model(self, resume=False):
       # Preparazione per il training
         self.update_log(
             "Training started with selected classes... ({})".format(
@@ -46,7 +47,7 @@ class TrainingManager:
         optimizer = torch.optim.Adam(model.parameters(), lr=self.config["optimizer_lr"])
 
         # Creazione di un'istanza di Trainer e inizio del training
-        trainer = Trainer(
+        self.trainer = Trainer(
             model,
             train_loader,
             train_loader_sizes,
@@ -57,7 +58,14 @@ class TrainingManager:
             self.selected_animal_type,
             self.selected_model_type,
         )
-        self.trained_model = trainer.train()
+        
+        if resume:
+            checkpoint_path = os.path.join(self.trainer.animal_dir, self.trainer.checkpoint_path)
+            start_epoch = self.trainer.load_checkpoint(checkpoint_path)
+        else:
+            start_epoch = 0
+        
+        self.trained_model = self.trainer.train(start_epoch=start_epoch)
 
         self.update_log("Training completed.")
 
@@ -163,3 +171,21 @@ class TrainingManager:
 
         self.experiment_thread = threading.Thread(target=self.run_experiment)
         self.experiment_thread.start()
+
+    def resume_training_thread(self, selected_classes, selected_model_type, selected_animal_type):
+        self.selected_classes = selected_classes
+        self.selected_model_type = selected_model_type
+        self.selected_animal_type = selected_animal_type
+        self.phase = "Train"
+        if not self.selected_classes:
+            messagebox.showerror("Error", "No classes selected")
+            return
+        print("Resuming training with classes:", self.selected_classes)
+
+        self.training_thread = threading.Thread(target=lambda: self.train_model(resume=True), daemon=True)
+        self.training_thread.start()
+
+    def stop_training(self):
+        """Stop the training thread."""
+        if self.training_thread.is_alive():
+            self.trainer.stop()

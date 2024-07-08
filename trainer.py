@@ -1,4 +1,5 @@
 from datetime import datetime
+import shutil
 from matplotlib import pyplot as plt
 from matplotlib import ticker
 import numpy as np
@@ -40,6 +41,8 @@ class Trainer:
         self.selected_classes = selected_classes
         self.log_function = log_function
         self.config = config
+        self.selected_animal_type = selected_animal_type
+        self.selected_model_type = selected_model_type
 
         dataloader_helper = DataLoaderHelper(self.config)
         self.model_visualizer = ModelVisualizer(self.model, dataloader_helper)
@@ -53,39 +56,54 @@ class Trainer:
             min_delta=self.config["early_stopping_min_delta"],
         )
         self.writer = SummaryWriter()
+        
         self.save_dir = save_dir
         self.global_step = 0
-        self.selected_animal_type = selected_animal_type
-        self.selected_model_type = selected_model_type
+        
+        self.model_dir = os.path.join(self.save_dir, self.selected_model_type)
+        self.animal_dir = os.path.join(self.model_dir, self.selected_animal_type)
+        self.checkpoint_path = f"checkpoint.pt"
+        self.stop_training_flag = False
 
         # Add model graph to TensorBoard
         dummy_input = torch.randn(1, 3, 224, 224).to(self.device)
         self.writer.add_graph(self.model, dummy_input)
         self.writer.flush()
 
-    def train(self):
+    def train(self, start_epoch=0):
         """
         Train the model using the specified dataloaders.
         """
+        # Remove the directory if it exists
+        if os.path.exists(self.animal_dir):
+            shutil.rmtree(self.animal_dir)
+        
+        # Create the directory
+        os.makedirs(self.animal_dir)
+        
         since = time.time()
         best_acc = 0.0
         current_time = datetime.now().strftime("%b%d_%H-%M-%S")
         experiment_name = f"{current_time}"
-        model_dir = os.path.join(self.save_dir, self.selected_model_type)
-        animal_dir = os.path.join(model_dir, self.selected_animal_type)
-        if not os.path.exists(animal_dir):
-            os.makedirs(animal_dir)
-
-        best_model_params_path = os.path.join(animal_dir, f"best_{experiment_name}.pt")
+        
+        best_model_params_path = os.path.join(self.animal_dir, f"best_{experiment_name}.pt")
+        
         should_stop = False
         
         # Save the initial model parameters
-        torch.save(self.model.state_dict(), best_model_params_path)
+        if start_epoch == 0:
+            torch.save(self.model.state_dict(), best_model_params_path)
 
-        for epoch in range(self.config["epochs_t_v"]):
+        for epoch in range(start_epoch, self.config["epochs_t_v"]):
             if should_stop:
                 break
-            print(f"\nEpoch {epoch}/{50 - 1}")
+            
+            if self.stop_training_flag:
+                self.save_checkpoint(epoch)
+                print("Training stopped by user")
+                break
+            
+            print(f"\nEpoch {epoch}/{self.config['epochs_t_v'] - 1}")
             print("---" * 10)
 
             self.run_epoch(epoch, "train") # Fase di training
@@ -181,3 +199,25 @@ class Trainer:
             )
 
         return epoch_loss, epoch_acc
+
+    def save_checkpoint(self, epoch):
+        state = {
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict()
+        }
+        torch.save(state, os.path.join(self.animal_dir, self.checkpoint_path))
+        print(f"Checkpoint saved at epoch {epoch}")
+
+    def load_checkpoint(self, checkpoint):
+        checkpoint = torch.load(checkpoint)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        epoch = checkpoint['epoch']
+        print(f"Checkpoint loaded from epoch {epoch}")
+        return epoch
+    
+    def stop(self):
+        self.stop_training_flag = True

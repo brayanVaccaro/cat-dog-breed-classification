@@ -1,4 +1,5 @@
 import json
+import os
 import tkinter as tk
 from tkinter import Frame, messagebox, scrolledtext
 import threading
@@ -78,6 +79,7 @@ class App:
         self.setup_class_selector()
         self.setup_log_area()
         self.choice_frame.pack_forget()
+        self.open_model_choice_dialog()
 
     def choose_cats(self):
         self.selected_animal_type = "cats"
@@ -85,6 +87,7 @@ class App:
         self.setup_class_selector()
         self.setup_log_area()
         self.choice_frame.pack_forget()
+        self.open_model_choice_dialog()
 
     def setup_class_selector(self):
         """Setup the class selector interface."""
@@ -163,20 +166,20 @@ class App:
         self.train_button = tk.Button(
             self.button_frame,
             text="Start Training",
-            command=lambda: self.open_model_choice_dialog("Train"),
+            command=lambda: self.start("Train"),
         )
         self.train_button.pack(side="left", padx=10, pady=10)
         
-        # self.stop_button = tk.Button(
-        #     self.button_frame, text="Stop Training", command=self.stop_training
-        # )
-        # self.stop_button.pack(side="right", padx=10, pady=10)
-        # self.stop_button.config(state=tk.DISABLED)
+        self.stop_button = tk.Button(
+            self.button_frame, text="Stop Training", command=self.stop_training
+        )
+        self.stop_button.pack(side="right", padx=10, pady=10)
+        self.stop_button.config(state=tk.DISABLED)
 
         self.test_button = tk.Button(
             self.button_frame,
             text="Test Model",
-            command=lambda: self.open_model_choice_dialog("Test"),
+            command=lambda: self.start("Test"),
         )
         self.test_button.pack(side="left", padx=10, pady=10)
         
@@ -184,36 +187,46 @@ class App:
         self.experiment_button = tk.Button(
             self.button_frame,
             text="Run Experiments",
-            command=lambda: self.open_model_choice_dialog("Experiment"),
+            command=lambda: self.start("Experiment"),
         )
         self.experiment_button.pack(side="left", padx=10, pady=10)
+        
+        # Bottone per riprendere il training
+        self.resume_button = tk.Button(
+            self.button_frame,
+            text="Resume Training",
+            command=self.resume_training,
+        )
+        self.resume_button.pack(side="left", padx=10, pady=10)
+        self.resume_button.config(state=tk.DISABLED)  # Disabled by default
 
-    def start_training_thread(self):
+    def start_training(self):
         """Start the training in a separate thread."""
         self.selected_classes = [
             cls for var, cls in zip(self.class_vars, self.classes) if var.get()
         ]
         self.train_button.config(state=tk.DISABLED)
-        # self.stop_button.config(state=tk.NORMAL)
+        self.test_button.config(state=tk.DISABLED)
+        self.stop_button.config(state=tk.NORMAL)
+        
         self.training_manager.start_training_thread(
             self.selected_classes, self.selected_model_type, self.selected_animal_type
         )
-        self.train_button.config(state=tk.NORMAL)
-        self.test_button.config(state=tk.NORMAL)
+        # self.train_button.config(state=tk.NORMAL)
         # self.stop_button.config(state=tk.DISABLED)
 
-    def start_testing_thread(self):
+    def start_testing(self):
         self.selected_classes = [
             cls for var, cls in zip(self.class_vars, self.classes) if var.get()
         ]
         self.test_button.config(state=tk.DISABLED)
         self.train_button.config(state=tk.DISABLED)
-        # self.stop_button.config(state=tk.DISABLED)
+        
         self.training_manager.start_testing_thread(
             self.selected_classes, self.selected_model_type
         )
         
-    def start_experiment_thread(self):
+    def start_experiment(self):
         """Run experiments in a separate thread."""
         self.selected_classes = [
             cls for var, cls in zip(self.class_vars, self.classes) if var.get()
@@ -228,12 +241,11 @@ class App:
         self.log_area.insert(tk.END, message + "\n")
         self.log_area.config(state="disabled")
 
-    def open_model_choice_dialog(self, phase):
+    def open_model_choice_dialog(self):
         """Open a dialog for model selection."""
         self.model_dialog = tk.Toplevel(self.root)
         self.model_dialog.title("Select Model Type")
         self.model_dialog.geometry("300x200")  # Dimensione della finestra
-        self.phase = phase
         
         # Impedisce interazioni con la finestra principale
         self.model_dialog.grab_set() 
@@ -255,22 +267,49 @@ class App:
         tk.Button(
             self.model_dialog,
             text="Select",
-            command=lambda: self.set_model_type(phase),
+            command=self.set_model_type,
             font=("Helvetica", 12),
         ).pack(pady=10)
 
-    def set_model_type(self, phase):
+    def set_model_type(self):
         """Set the selected model type and start the corresponding thread."""
         self.selected_model_type = self.available_models[self.model_var.get()]
         self.model_dialog.destroy()
+        self.check_for_checkpoint()
         
+    def start(self, phase):
         if phase == "Train":
-            self.start_training_thread()
+            self.start_training()
         elif phase == "Test":
-            self.start_testing_thread()
+            self.start_testing()
         elif phase == "Experiment":
-            self.start_experiment_thread()
+            self.start_experiment()
 
+    def stop_training(self):
+        """Stop the training thread."""
+        self.training_manager.stop_training()
+        self.train_button.config(state=tk.NORMAL)
+        self.stop_button.config(state=tk.DISABLED)
+        
+    def check_for_checkpoint(self):
+        selected_animal_type = self.selected_animal_type
+        selected_model_type = self.selected_model_type
+        self.model_dir = os.path.join(self.config['save_dir'], selected_model_type)
+        self.animal_dir = os.path.join(self.model_dir, selected_animal_type)
+        self.checkpoint_path = 'checkpoint.pt'
+        if os.path.exists(os.path.join(self.animal_dir, self.checkpoint_path)):
+            self.resume_button.config(state=tk.NORMAL)
+            self.train_button.config(state=tk.DISABLED)
+        else:
+            self.resume_button.config(state=tk.DISABLED)
+
+    def resume_training(self):
+        self.selected_classes = [
+            cls for var, cls in zip(self.class_vars, self.classes) if var.get()
+        ]
+        self.training_manager.resume_training_thread(
+            self.selected_classes, self.selected_model_type, self.selected_animal_type
+        )
 if __name__ == "__main__":
     root = tk.Tk()
     app = App(root)
