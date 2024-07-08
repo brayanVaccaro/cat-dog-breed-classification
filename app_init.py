@@ -25,7 +25,7 @@ class App:
         self.dog_classes, self.cat_classes = self.data_loader.breeds()
         self.selected_animal_type = None
         self.selected_classes = []
-        self.available_models = {0: "Resnet50", 1: "AlexNet"}
+        self.available_models = {0: "ResNet50", 1: "AlexNet"}
         # Caricamento delle classi del dataset
         self.classes = self.data_loader.classes_to_idx
         self.training_manager = TrainingManager(
