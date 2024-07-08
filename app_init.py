@@ -10,7 +10,6 @@ from trainer import Trainer
 from sklearn.metrics import classification_report, confusion_matrix
 from training_manager import TrainingManager
 
-
 class App:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -167,7 +166,7 @@ class App:
             command=lambda: self.open_model_choice_dialog("Train"),
         )
         self.train_button.pack(side="left", padx=10, pady=10)
-
+        
         # self.stop_button = tk.Button(
         #     self.button_frame, text="Stop Training", command=self.stop_training
         # )
@@ -179,10 +178,15 @@ class App:
             text="Test Model",
             command=lambda: self.open_model_choice_dialog("Test"),
         )
-        self.test_button.config(
-            state=tk.NORMAL
-        )  # Disabilitato fino al completamento del training
-        self.test_button.pack()
+        self.test_button.pack(side="left", padx=10, pady=10)
+        
+        # Bottone per eseguire gli esperimenti
+        self.experiment_button = tk.Button(
+            self.button_frame,
+            text="Run Experiments",
+            command=self.run_experiments,
+        )
+        self.experiment_button.pack(side="left", padx=10, pady=10)
 
     def start_training_thread(self):
         """Start the training in a separate thread."""
@@ -208,6 +212,13 @@ class App:
         self.training_manager.start_testing_thread(
             self.selected_classes, self.selected_model_type
         )
+        
+    def run_experiments(self):
+        """Run experiments in a separate thread."""
+        self.selected_classes = [
+            cls for var, cls in zip(self.class_vars, self.classes) if var.get()
+        ]
+        self.training_manager.start_experiment_thread(self.selected_classes)
 
     def update_log(self, message):
         """Update the log area in the UI with a new message."""
@@ -247,7 +258,6 @@ class App:
         # Attesa che la finestra di dialogo venga chiusa per continuare l'esecuzione
         self.root.wait_window(self.model_dialog)
 
-
     def choose_model(self, model_type):
         """Set the selected model type, close the dialog, and start training."""
         self.selected_model_type = model_type
@@ -256,7 +266,6 @@ class App:
             self.start_training_thread()
         else:
             self.start_testing_thread()
-
 
 if __name__ == "__main__":
     root = tk.Tk()

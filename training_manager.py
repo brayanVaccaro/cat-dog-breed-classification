@@ -5,7 +5,7 @@ from DataLoaderHelper import DataLoaderHelper
 from model_factory import ModelFactory
 from tester import Tester
 from trainer import Trainer
-
+from experiment import ExperimentRunner  # Importa la funzione che esegue gli esperimenti
 
 class TrainingManager:
     def __init__(self, config, update_log, data_loader: DataLoaderHelper, model_factory: ModelFactory):
@@ -16,12 +16,13 @@ class TrainingManager:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.training_thread = None
         self.testing_thread = None
+        self.experiment_thread = None  # Thread per gli esperimenti
         self.trained_model = None
         self.selected_model_type = None
         self.selected_classes = []
 
     def train_model(self):
-        # Preparazione per il training
+      # Preparazione per il training
         self.update_log(
             "Training started with selected classes... ({})".format(
                 self.selected_classes
@@ -140,3 +141,23 @@ class TrainingManager:
         
         self.testing_thread = threading.Thread(target=self.test_model, daemon=True)
         self.testing_thread.start()
+
+
+    def run_experiment(self):
+         er = ExperimentRunner('./runs', self.config, True)
+         er.dataloaders, er.dataset_sizes = self.data_loader.load_data(selected_classes=self.selected_classes)
+         er.selected_classes = self.selected_classes
+         self.selected_model_type = "ResNet50"
+         er.model = self.load_model()
+         er.run_experiments()
+
+    
+    def start_experiment_thread(self, selected_classes):
+        self.selected_classes = selected_classes
+        self.phase = "Experiment"
+        if self.experiment_thread and self.experiment_thread.is_alive():
+            self.update_log("Experiment is already in progress.")
+            return
+
+        self.experiment_thread = threading.Thread(target=self.run_experiment)
+        self.experiment_thread.start()
