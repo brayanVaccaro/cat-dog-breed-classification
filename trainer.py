@@ -122,6 +122,9 @@ class Trainer:
 
         running_loss = 0.0
         running_corrects = 0
+        embeddings = []
+        labels_list = []
+        inputs_list = []
 
         for batch_number, (inputs, labels) in enumerate(self.dataloaders[phase]):
             self.global_step += 1
@@ -139,6 +142,11 @@ class Trainer:
 
             running_loss += loss.item() * inputs.size(0)
             running_corrects += torch.sum(preds == labels.data)
+
+            if phase == "val":
+                embeddings.append(outputs)
+                labels_list.append(labels)
+                inputs_list.append(inputs)
 
             self.log_function(f"{phase.format()} Batch {batch_number} Loss: {loss}")
 
@@ -160,5 +168,16 @@ class Trainer:
 
         if phase == "train":
             self.scheduler.step()
+        else:
+            # Log embeddings to TensorBoard
+            embeddings = torch.cat(embeddings).cpu()
+            labels_list = torch.cat(labels_list).cpu()
+            inputs_list = torch.cat(inputs_list).cpu()
+            self.writer.add_embedding(
+                embeddings,
+                metadata=labels_list,
+                label_img=inputs_list,
+                global_step=self.global_step
+            )
 
         return epoch_loss, epoch_acc
