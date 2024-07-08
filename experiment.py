@@ -147,7 +147,7 @@ class ExperimentRunner:
          exp_epochs = [10]  # Accorciato per test rapidi
 
          # Lista dei learning rate da testare
-         exp_lrs = [0.001, 0.0005, 0.0001]
+         exp_lrs = [0.001, 0.0001]
 
          # Lista delle dimensioni dei batch e delle dimensioni del dataset
          exp_batch_sizes = [32, 64]

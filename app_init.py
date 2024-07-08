@@ -184,7 +184,7 @@ class App:
         self.experiment_button = tk.Button(
             self.button_frame,
             text="Run Experiments",
-            command=self.run_experiments,
+            command=lambda: self.open_model_choice_dialog("Experiment"),
         )
         self.experiment_button.pack(side="left", padx=10, pady=10)
 
@@ -213,12 +213,14 @@ class App:
             self.selected_classes, self.selected_model_type
         )
         
-    def run_experiments(self):
+    def start_experiment_thread(self):
         """Run experiments in a separate thread."""
         self.selected_classes = [
             cls for var, cls in zip(self.class_vars, self.classes) if var.get()
         ]
-        self.training_manager.start_experiment_thread(self.selected_classes)
+        self.training_manager.start_experiment_thread(
+           self.selected_classes, self.selected_model_type
+           )
 
     def update_log(self, message):
         """Update the log area in the UI with a new message."""
@@ -235,37 +237,39 @@ class App:
         
         # Impedisce interazioni con la finestra principale
         self.model_dialog.grab_set() 
-
         tk.Label(
-            self.model_dialog, text="Select Model Type", font=("Helvetica", 18)
+            self.model_dialog, text="Select Model Type", font=("Helvetica", 14)
         ).pack(pady=20)
 
-        self.resnet_button = tk.Button(
-            self.model_dialog,
-            text="ResNet50",
-            command=lambda: self.choose_model("ResNet50"),
-            font=("Helvetica", 16),
-        )
-        self.resnet_button.pack(side="left", padx=20, pady=20)
+        self.model_var = tk.IntVar()
 
-        self.alexnet_button = tk.Button(
-            self.model_dialog,
-            text="AlexNet",
-            command=lambda: self.choose_model("AlexNet"),
-            font=("Helvetica", 16),
-        )
-        self.alexnet_button.pack(side="right", padx=20, pady=20)
-        # Attesa che la finestra di dialogo venga chiusa per continuare l'esecuzione
-        self.root.wait_window(self.model_dialog)
+        for idx, model_name in self.available_models.items():
+            tk.Radiobutton(
+                self.model_dialog,
+                text=model_name,
+                variable=self.model_var,
+                value=idx,
+                font=("Helvetica", 12),
+            ).pack(anchor="w")
 
-    def choose_model(self, model_type):
-        """Set the selected model type, close the dialog, and start training."""
-        self.selected_model_type = model_type
-        self.model_dialog.destroy()  # Chiude la finestra di dialogo
-        if self.phase == "Train":
+        tk.Button(
+            self.model_dialog,
+            text="Select",
+            command=lambda: self.set_model_type(phase),
+            font=("Helvetica", 12),
+        ).pack(pady=10)
+
+    def set_model_type(self, phase):
+        """Set the selected model type and start the corresponding thread."""
+        self.selected_model_type = self.available_models[self.model_var.get()]
+        self.model_dialog.destroy()
+        
+        if phase == "Train":
             self.start_training_thread()
-        else:
+        elif phase == "Test":
             self.start_testing_thread()
+        elif phase == "Experiment":
+            self.start_experiment_thread()
 
 if __name__ == "__main__":
     root = tk.Tk()

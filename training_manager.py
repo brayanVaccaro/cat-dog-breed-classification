@@ -152,8 +152,10 @@ class TrainingManager:
          er.run_experiments()
 
     
-    def start_experiment_thread(self, selected_classes):
+    def start_experiment_thread(self, selected_classes, selected_model_type):
         self.selected_classes = selected_classes
+        self.selected_model_type = selected_model_type
+
         self.phase = "Experiment"
         if self.experiment_thread and self.experiment_thread.is_alive():
             self.update_log("Experiment is already in progress.")
