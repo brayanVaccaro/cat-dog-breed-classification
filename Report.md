@@ -31,14 +31,23 @@
 ## Obiettivo
 L'obiettivo principale di questo progetto è sviluppare un'applicazione che permetta di addestrare un modello di rete neurale convoluzionale (CNN) per la classificazione delle immagini di cani e gatti del dataset OxfordIIITPet. L'applicazione offre un'interfaccia grafica che consenta agli utenti di selezionare le classi di animali da addestrare e testare, visualizzare i progressi e i risultati del training, e utilizzare TensorBoard per esplorare gli embeddings.
 Le classi sono suddivise in più file e ciascuna di queste ha un compito ben preciso per garantire la modularità del codice:
-- app_init.py: contiene la classe App responsabile dell'inizializzazione dell'applicazione. Per avviare l'applicazione infatti si deve runnare questo file
-- DataLoaderHelper.py: fornisce utilità e funzioni di supporto per il caricamento dei dati. Include funzioni per la preparazione dei DataLoader, la suddivisione del dataset in training, validation e test set, e altre operazioni legate alla gestione dei dati.
-- EarlyStopper.py: implementa una classe per l'early stopping. L'early stopping è una tecnica utilizzata per interrompere l'allenamento di un modello quando le prestazioni su un set di validazione non migliorano più, prevenendo così l'overfitting.
+- app_init.py: responsabile dell'inizializzazione dell'applicazione. Configura e avvia la interfaccia grafica facendo uso di Tkinter. Utilizza parametri di configurazione presi dal file config.json e integra diverse funzionalità:
+  - setup della UI: fa uso delle funzionalità di Tkinter come Frame, Widget Text, TopLevel Widget
+  - gestione delle fasi di training, testing e experiment: tutti e tre possono essere iniziati, il training in più può essere stoppato e ripreso 
+  - uso di log
+- DataLoaderHelper.py: offre funzionalità e funzioni di supporto per caricare il dataset Oxford IIIT Pet dataset e su questo effettuare le seguenti operazioni:
+
+  - filtraggio: prendere il dataset originale e filtrarlo sulle classi scelte dall'utente
+  - dividere (esclusivo per la fase di training): prendere il dataset filtrato e dividerlo con un rapporto di 8 a 2. Ossia l'80% sarà il dataset di training e il 20% sarà il dataset di validation
+  - trasformare: applicare le trasformazioni adeguate al dataset creato (train o val)
+
+  Si presta attenzione a rimappare le label ai nuovi indici delle classi affincè il seguente controllo non fallisca: Assertion t >= 0 && t < n_classes
+- training_manager.py: gestisce le procedure di training, testing e experiment. È strettamente legato ad app_init in quanto le scelte fatte dall'utente portano ai corrispondenti metodi di questo file. Coordina le varie fasi come il caricamento dei dati, l'allenamento, il testing ed experiment del modello, il salvataggio dei checkpoint, e altre operazioni necessarie per l'esecuzione completa del ciclo della procedura scelta. Inoltre incapsula le operazioni in thread per mantenere la app responsive.
+- trainer.py: questo file contiene la logica di allenamento del modello. Include funzioni per il ciclo di training e validation, nonchè per fermare l'addestramento e riprenderlo successivamente (funzionalità gestita dal bottone stop_training). Si avvale della classe EarlyStopper per interrompere il ciclo di addestramento
+- EarlyStopper.py: l'obiettivo principale di questo file è di interrompere l'addestramento del modello anticipatamente per prevenire il sovraadattamento (overfitting) e per risparmiare risorse computazionali. I valori utili, min_delta e patience, sono configurati tramite il file config.json.
 - experiment.py: contiene la logica per la gestione e l'esecuzione di esperimenti. Include funzioni per configurare, lanciare e monitorare esperimenti con diverse impostazioni di iperparametri, batch size, e altre variabili sperimentali.
-- model_factory.py: fornisce una factory per la creazione di modelli. Include funzioni per costruire e restituire modelli di rete neurale predefiniti o configurabili, semplificando il processo di inizializzazione dei modelli durante gli esperimenti. 
+- model_factory.py: fornisce una factory per la creazione di modelli. Include funzioni per costruire e restituire modelli di rete neurale semplificando il processo di inizializzazione dei modelli durante gli esperimenti. È possibile creare due modelli: ResNet e AlexNet. Ad entrambi si sostituisce l'ultimo layer passandogli il numero di classi scelte dall'utente. 
 - tester.py: responsabile della logica di testing del modello. Include funzioni per valutare le prestazioni del modello su un set di test, calcolare metriche di performance e generare report di valutazione.
-- trainer.py: questo file contiene la logica di allenamento del modello. Include funzioni per il ciclo di training, l'aggiornamento dei pesi del modello, il calcolo della loss e altre operazioni necessarie per l'addestramento del modello.
-- training_manger.py: gestisce il processo di allenamento complessivo. Coordina le varie componenti come il caricamento dei dati, l'allenamento del modello, il salvataggio dei checkpoint, l'early stopping e altre operazioni necessarie per l'esecuzione completa del ciclo di vita dell'allenamento del modello.
 
 ## Esperimenti
 
