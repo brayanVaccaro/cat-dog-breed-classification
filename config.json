@@ -7,5 +7,7 @@
     "test_size": 0.25,
 
     "early_stopping_patience": 3,
-    "early_stopping_min_delta": 0.03
+    "early_stopping_min_delta": 0.03,
+
+    "save_dir": "./model_weights"
 }
