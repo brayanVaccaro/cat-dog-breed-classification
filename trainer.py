@@ -100,11 +100,11 @@ class Trainer:
             
             if self.stop_training_flag:
                 self.save_checkpoint(epoch)
-                print("Training stopped by user")
+                self.log_function("Training stopped by user")
                 break
             
-            print(f"\nEpoch {epoch}/{self.config['epochs_t_v'] - 1}")
-            print("---" * 10)
+            self.log_function(f"\nEpoch {epoch}/{self.config['epochs_t_v'] - 1}")
+            self.log_function("---" * 10)
 
             self.run_epoch(epoch, "train") # Fase di training
             val_loss, val_acc = self.run_epoch(epoch, "val") #Fase di validation
@@ -114,15 +114,15 @@ class Trainer:
                 torch.save(self.model.state_dict(), best_model_params_path)
 
             if self.early_stopper.early_stop(val_loss):
-                print("Early stopping triggered")
+                self.log_function("Early stopping triggered")
                 should_stop = True
                 break
 
         time_elapsed = time.time() - since
-        print(
+        self.log_function(
             f"Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s"
         )
-        print(f"Best val Acc: {best_acc:.4f}")
+        self.log_function(f"Best val Acc: {best_acc:.4f}")
 
         # Load the best model parameters saved during training
         self.model.load_state_dict(torch.load(best_model_params_path))
@@ -131,11 +131,10 @@ class Trainer:
         return self.model
 
     def run_epoch(self, epoch, phase):
+        self.log_function(f"INIZIO FASE {phase}")
         if phase == "train":
-            print(f"INIZIO FASE {phase}")
             self.model.train()
         else:
-            print(f"INIZIO FASE {phase}")
             self.model.eval()
 
         running_loss = 0.0
@@ -166,7 +165,7 @@ class Trainer:
                 labels_list.append(labels)
                 inputs_list.append(inputs)
 
-            self.log_function(f"{phase.format()} Batch {batch_number} Loss: {loss}")
+            print(f"{phase.format()} Batch {batch_number} Loss: {loss}")
 
             if phase == "val" and batch_number % 5 == 0:
                 self.writer.add_figure(
@@ -180,7 +179,7 @@ class Trainer:
         epoch_loss = running_loss / self.dataset_sizes[phase]
         epoch_acc = running_corrects.double() / self.dataset_sizes[phase]
         
-        print(f"EPOCH {epoch} --> Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}\n")
+        self.log_function(f"EPOCH {epoch} --> Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}\n")
         self.writer.add_scalar(f"{phase}/Loss", epoch_loss, epoch)
         self.writer.add_scalar(f"{phase}/Accuracy", epoch_acc, epoch)
 
@@ -191,9 +190,13 @@ class Trainer:
             embeddings = torch.cat(embeddings).cpu()
             labels_list = torch.cat(labels_list).cpu()
             inputs_list = torch.cat(inputs_list).cpu()
+            
+            class_names = self.selected_classes
+            labels_name = [class_names[i] for i in labels_list]
+            metadata=[f'{label}:{name}' for label,name in zip(labels_list, labels_name)]
             self.writer.add_embedding(
                 embeddings,
-                metadata=labels_list,
+                metadata=metadata,
                 label_img=inputs_list,
                 global_step=self.global_step
             )
@@ -208,7 +211,7 @@ class Trainer:
             'scheduler_state_dict': self.scheduler.state_dict()
         }
         torch.save(state, os.path.join(self.animal_dir, self.checkpoint_path))
-        print(f"Checkpoint saved at epoch {epoch}")
+        self.log_function(f"Checkpoint saved at epoch {epoch}")
 
     def load_checkpoint(self, checkpoint):
         checkpoint = torch.load(checkpoint)
@@ -216,7 +219,7 @@ class Trainer:
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         epoch = checkpoint['epoch']
-        print(f"Checkpoint loaded from epoch {epoch}")
+        self.log_function(f"Checkpoint loaded from epoch {epoch}")
         return epoch
     
     def stop(self):
