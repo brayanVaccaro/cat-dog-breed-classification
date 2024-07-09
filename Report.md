@@ -20,9 +20,7 @@
   - [Risultati Ottenuti](#risultati-ottenuti)
   - [Grafici e Visualizzazioni](#grafici-e-visualizzazioni)
     - [1. Training Loss e Accuracy](#1-training-loss-e-accuracy)
-    - [2. Classification Report](#2-classification-report)
-    - [3. Confusion Matrix](#3-confusion-matrix)
-    - [4. Projector](#4-projector)
+    - [2. Validation Loss e Accuracy](#2-validation-loss-e-accuracy)
   - [Esperimenti](#esperimenti-1)
   - [Visualizzazione degli Embeddings](#visualizzazione-degli-embeddings)
   - [Considerazioni Finali](#considerazioni-finali)
@@ -104,35 +102,26 @@ L'obiettivo era ottenere un modello di classificazione accurato, in grado di dis
 ## Grafici e Visualizzazioni
 
 ### 1. Training Loss e Accuracy
-Da mettere immagini
+<div align="center">
+    <img src="./img/img.png">
+</div><br>
 
-### 2. Classification Report
-Da mettere immagini
-
-### 3. Confusion Matrix
-La matrice di confusione fornisce una rappresentazione visiva degli errori di classificazione commessi dal modello. Ogni riga rappresenta le istanze di una classe predetta mentre ogni colonna rappresenta le istanze della classe reale.
-
-Da mettere immagini
-
-Nella matrice di confusione:
-- Gli elementi sulla diagonale rappresentano il numero di istanze correttamente classificate per ciascuna classe.
-- Gli elementi fuori dalla diagonale rappresentano le istanze mal classificate.
-
-### 4. Projector
-
-Da mettere immagini
+### 2. Validation Loss e Accuracy
+<div align="center">
+    <img src="./img/img2.png">
+</div><br>
 
 ## Esperimenti
 
-Cliccando il tasto "Run Experiments" è possibile avviare una serie di esperimenti che testano diverse configurazioni del modello di rete neurale. Durante questi esperimenti, vengono variati parametri come il numero di epoche, il learning rate, la dimensione del batch e la dimensione del dataset. I risultati, inclusi la loss e l'accuratezza, vengono registrati e visualizzati utilizzando TensorBoard. Questo processo aiuta a identificare la configurazione ottimale degli iperparametri per massimizzare le prestazioni del modello.  
+Cliccando il tasto "Run Experiments" è possibile avviare una serie di esperimenti che testano diverse configurazioni del modello di rete neurale. Durante questi esperimenti, vengono variati parametri come il numero di epoche, il learning rate, la dimensione del batch e la dimensione del dataset. I risultati, inclusi la loss e l'accuratezza, vengono registrati e visualizzati utilizzando TensorBoard. Questo processo aiuta a identificare la configurazione ottimale degli iperparametri per massimizzare le prestazioni del modello.
 
-Da mettere immagini
+<div align="center">
+    <img src="./img/img4.png">
+</div><br>
 
 ## Visualizzazione degli Embeddings
 
 L'utilizzo di TensorBoard per visualizzare gli embeddings fornisce un insight visivo su come il modello rappresenta le diverse classi. Gli embeddings proiettati in uno spazio a bassa dimensione (usando tecniche come PCA o t-SNE) possono mostrare cluster distinti per ciascuna classe.
-
-Da mettere immagine
 
 ## Considerazioni Finali
 
@@ -140,4 +129,6 @@ Purtroppo non siamo riusciti ad arrivare alla perfezione del 100% di accuratezza
 
 ### Grafico dei vari layer del progetto:
 
-Da mettere immagine grafo
+<div align="center">
+    <img src="./img/img3.png">
+</div><br>
