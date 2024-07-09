@@ -152,17 +152,41 @@ class TrainingManager:
 
 
     def run_experiment(self):
-         er = ExperimentRunner('./runs', self.config, True)
-         er.dataloaders, er.dataset_sizes = self.data_loader.load_data(selected_classes=self.selected_classes)
-         er.selected_classes = self.selected_classes
-         self.selected_model_type = "ResNet50"
-         er.model = self.load_model()
-         er.run_experiments()
+        loss_fn = torch.nn.CrossEntropyLoss()
+        
+        experiment = ExperimentRunner('./runs', self.config, self.selected_classes, loss_fn, self.update_log, True)
+        
+        # Lista del numero di epoche da testare
+        exp_epochs = [100]  # Accorciato per test rapidi
 
-    
-    def start_experiment_thread(self, selected_classes, selected_model_type):
+        # Lista dei learning rate da testare
+        exp_lrs = [0.001, 0.0001]
+
+        # Lista delle dimensioni dei batch e delle dimensioni del dataset
+        exp_batch_sizes = [32, 64]
+        exp_dataset_sizes = [100, 300, 500, 1000, 1500]
+
+        # Cicla attraverso le configurazioni e esegui gli esperimenti
+        exp_counter = 0
+        for epochs in exp_epochs:
+            for lr in exp_lrs:
+                for batch_size in exp_batch_sizes:
+                    model = self.load_model()
+                    experiment.setup_experiment(
+                        num_epochs=epochs, l_rate=lr, batch_size=batch_size, model=model
+                    )
+                    experiment.run_experiment(f"test_{exp_counter}")
+                    exp_counter += 1
+                    self.update_log(f" - Esperimento {exp_counter}: completato.")
+
+        print("Lab: chiuso")
+
+        self.update_log("Esperimenti terminati.")
+
+    def start_experiment_thread(self, selected_classes, selected_model_type,selected_animal_type):
         self.selected_classes = selected_classes
         self.selected_model_type = selected_model_type
+        self.selected_animal_type = selected_animal_type
 
         self.phase = "Experiment"
         if self.experiment_thread and self.experiment_thread.is_alive():

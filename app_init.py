@@ -232,7 +232,7 @@ class App:
             cls for var, cls in zip(self.class_vars, self.classes) if var.get()
         ]
         self.training_manager.start_experiment_thread(
-           self.selected_classes, self.selected_model_type
+           self.selected_classes, self.selected_model_type, self.selected_animal_type
            )
 
     def update_log(self, message):

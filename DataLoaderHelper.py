@@ -136,7 +136,7 @@ class DataLoaderHelper:
         from collections import Counter
 
         label_counts = Counter(labels)
-        print(f"{dataset_type} dataset distribution:")
+        print(f"\n{dataset_type} dataset distribution:")
         for class_idx, count in label_counts.items():
             class_name = [
                 name
@@ -175,6 +175,44 @@ class DataLoaderHelper:
         )
         # self.display_all_images(dataloader) #DEBUG
         return dataloader, len(test_dataset)
+    
+    def load_experiment_data(self, selected_classes, batch_size):
+        self.selected_classes = selected_classes
+        
+        filtered_class_to_idx, selected_indices, updated_labels = self.filter_dataset(
+            self.dataset
+        )
+
+        train_indices, val_indices, train_labels, val_labels = self.split_dataset(
+            selected_indices, updated_labels
+        )
+        
+        self.print_class_distribution(val_indices, val_labels, "EXPERIMENT")
+
+        train_dataset = FilteredDataset(
+            self.dataset, train_indices, train_labels, self.data_transforms["train"]
+        )
+        val_dataset = FilteredDataset(
+            self.dataset, val_indices, val_labels, self.data_transforms["val"]
+        )
+
+        dataloaders = {
+            "train": DataLoader(
+                train_dataset,
+                batch_size=batch_size ,
+                shuffle=True,
+                num_workers=4,
+            ),
+            "val": DataLoader(
+                val_dataset,
+                batch_size=batch_size ,
+                shuffle=False,
+                num_workers=4,
+            ),
+        }
+        dataset_sizes = {"train": len(train_dataset), "val": len(val_dataset)}
+
+        return dataloaders, dataset_sizes
 
     def matplotlib_imshow(self, img: Tensor):
 
