@@ -42,9 +42,7 @@ class TrainingManager:
 
         # Utilizzo di ModelFactory per creare il modello
 
-        model = self.load_model()
-
-        optimizer = torch.optim.Adam(model.parameters(), lr=self.config["optimizer_lr"])
+        model, optimizer = self.load_model()
 
         # Creazione di un'istanza di Trainer e inizio del training
         self.trainer = Trainer(
@@ -113,8 +111,10 @@ class TrainingManager:
         
         if self.selected_model_type == "ResNet50":
             model = self.model_factory.get_resnet50(n_classes).to(self.device)
+            optimizer = torch.optim.Adam(model.parameters(), lr=self.config["optimizer_lr"])
         elif self.selected_model_type == "AlexNet":
             model = self.model_factory.get_alexnet(n_classes).to(self.device)
+            optimizer = torch.optim.SGD(model.parameters(), lr=self.config["optimizer_lr"], momentum=self.config['momentum'])
         
         if self.phase == 'Test':
             model.load_state_dict(torch.load(model_path))
@@ -122,7 +122,7 @@ class TrainingManager:
             self.update_log(f"Model loaded from {model_path}")
             return
         
-        return model
+        return model, optimizer
 
     def start_training_thread(self, selected_classes, selected_model_type, selected_animal_type):
         self.selected_classes = selected_classes
