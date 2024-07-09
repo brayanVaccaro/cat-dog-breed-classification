@@ -1,91 +1,134 @@
-# Relazione sul Progetto di Classificazione delle Immagini del Dataset OxfordIIITPet
+# Relazione Laboratorio di Ottimizzazione, Intelligenza Artificiale e Machine Learning: Progetto di Classificazione delle Immagini del Dataset OxfordIIITPet
+
+## Table of Contents
+- [Relazione Laboratorio di Ottimizzazione, Intelligenza Artificiale e Machine Learning: Progetto di Classificazione delle Immagini del Dataset OxfordIIITPet](#relazione-laboratorio-di-ottimizzazione-intelligenza-artificiale-e-machine-learning-progetto-di-classificazione-delle-immagini-del-dataset-oxfordiiitpet)
+  - [Table of Contents](#table-of-contents)
+  - [Obiettivo](#obiettivo)
+  - [Esperimenti](#esperimenti)
+    - [Configurazione del Dataset](#configurazione-del-dataset)
+    - [Architettura del Modello](#architettura-del-modello)
+    - [Training del Modello](#training-del-modello)
+    - [Testing e Valutazione](#testing-e-valutazione)
+    - [Visualizzazione con TensorBoard](#visualizzazione-con-tensorboard)
+  - [Problematiche Riscontrate](#problematiche-riscontrate)
+    - [Preparazione del Dataset](#preparazione-del-dataset)
+    - [Configurazione dei Modelli](#configurazione-dei-modelli)
+    - [Performance del Training](#performance-del-training)
+    - [Automazione degli esperimenti](#automazione-degli-esperimenti)
+  - [Punti Critici](#punti-critici)
+  - [Risultato Atteso](#risultato-atteso)
+  - [Risultati Ottenuti](#risultati-ottenuti)
+  - [Grafici e Visualizzazioni](#grafici-e-visualizzazioni)
+    - [1. Training Loss e Accuracy](#1-training-loss-e-accuracy)
+    - [2. Classification Report](#2-classification-report)
+    - [3. Confusion Matrix](#3-confusion-matrix)
+    - [4. Projector](#4-projector)
+  - [Esperimenti](#esperimenti-1)
+  - [Visualizzazione degli Embeddings](#visualizzazione-degli-embeddings)
+  - [Considerazioni Finali](#considerazioni-finali)
+    - [Grafico dei vari layer del progetto:](#grafico-dei-vari-layer-del-progetto)
 
 ## Obiettivo
-
-L'obiettivo principale di questo progetto è sviluppare un'applicazione che permetta di addestrare un modello di rete neurale convoluzionale (CNN) per la classificazione delle immagini di cani e gatti del dataset OxfordIIITPet. L'applicazione deve offrire un'interfaccia grafica che consenta agli utenti di selezionare le classi di animali da addestrare e testare, visualizzare i progressi e i risultati del training, e utilizzare TensorBoard per esplorare gli embeddings.
+L'obiettivo principale di questo progetto è sviluppare un'applicazione che permetta di addestrare un modello di rete neurale convoluzionale (CNN) per la classificazione delle immagini di cani e gatti del dataset OxfordIIITPet. L'applicazione offre un'interfaccia grafica che consenta agli utenti di selezionare le classi di animali da addestrare e testare, visualizzare i progressi e i risultati del training, e utilizzare TensorBoard per esplorare gli embeddings.
+Le classi sono suddivise in più file e ciascuna di queste ha un compito ben preciso per garantire la modularità del codice:
+- app_init.py: contiene la classe App responsabile dell'inizializzazione dell'applicazione. Per avviare l'applicazione infatti si deve runnare questo file
+- DataLoaderHelper.py: fornisce utilità e funzioni di supporto per il caricamento dei dati. Include funzioni per la preparazione dei DataLoader, la suddivisione del dataset in training, validation e test set, e altre operazioni legate alla gestione dei dati.
+- EarlyStopper.py: implementa una classe per l'early stopping. L'early stopping è una tecnica utilizzata per interrompere l'allenamento di un modello quando le prestazioni su un set di validazione non migliorano più, prevenendo così l'overfitting.
+- experiment.py: contiene la logica per la gestione e l'esecuzione di esperimenti. Include funzioni per configurare, lanciare e monitorare esperimenti con diverse impostazioni di iperparametri, batch size, e altre variabili sperimentali.
+- model_factory.py: fornisce una factory per la creazione di modelli. Include funzioni per costruire e restituire modelli di rete neurale predefiniti o configurabili, semplificando il processo di inizializzazione dei modelli durante gli esperimenti. 
+- tester.py: responsabile della logica di testing del modello. Include funzioni per valutare le prestazioni del modello su un set di test, calcolare metriche di performance e generare report di valutazione.
+- trainer.py: questo file contiene la logica di allenamento del modello. Include funzioni per il ciclo di training, l'aggiornamento dei pesi del modello, il calcolo della loss e altre operazioni necessarie per l'addestramento del modello.
+- training_manger.py: gestisce il processo di allenamento complessivo. Coordina le varie componenti come il caricamento dei dati, l'allenamento del modello, il salvataggio dei checkpoint, l'early stopping e altre operazioni necessarie per l'esecuzione completa del ciclo di vita dell'allenamento del modello.
 
 ## Esperimenti
 
-1. **Configurazione del Dataset**:
-   - Il dataset OxfordIIITPet è stato utilizzato per l'addestramento e il testing del modello. Questo dataset include immagini di varie razze di cani e gatti, con annotazioni delle razze.
-   - Le immagini sono state suddivise in set di training, validation e testing.
+### Configurazione del Dataset
+- Il dataset OxfordIIITPet è stato utilizzato per l'addestramento e il testing del modello. Questo dataset include immagini di varie razze di cani e gatti, con annotazioni delle razze.
+- Le immagini sono state suddivise in set di training, validation e testing.
 
-2. **Architettura del Modello**:
-   - È stato utilizzato i modelli ResNet50 e AlexNet pre-addestrato per beneficiare del trasferimento di apprendimento.
-   - Il modello è stato adattato per classificare il numero di classi selezionate dall'utente.
+### Architettura del Modello
+- È stato utilizzato i modelli ResNet50 e AlexNet pre-addestrati per beneficiare del trasferimento di apprendimento.
+- Il modello è stato adattato per classificare il numero di classi selezionate dall'utente.
 
-3. **Training del Modello**:
-   - Il training è stato effettuato utilizzando gli ottimizzatori Adam con un learning rate iniziale di 0.0001 e SGD con una learning rate iniziale di 0.001.
-   - Il modello è stato addestrato per un numero fisso di epoche, con monitoraggio delle metriche di accuratezza e perdita.
-   - E' stato implementato l'Early stopping in modo tale che la fase di addestramento possa essere fermata.
-   - Attraverso il bottone Stop invece è possibile salvare un checkpoint della fase di trainning e riprendere l'esecuzione del trainning con un load del file di checkpoint
+### Training del Modello
+- Il training è stato effettuato utilizzando gli ottimizzatori Adam con un learning rate iniziale di 0.0001 e SGD con una learning rate iniziale di 0.001.
+- Il modello è stato addestrato per un numero fisso di epoche, con monitoraggio delle metriche di accuratezza e perdita.
+- E' stato implementato l'Early stopping in modo tale che la fase di addestramento possa essere fermata.
+- Attraverso il bottone Stop invece è possibile salvare un checkpoint della fase di trainning e riprendere l'esecuzione del trainning con un load del file di checkpoint.
 
-4. **Testing e Valutazione**:
-   - Dopo il training, il modello è stato testato su un set di immagini non viste.
-   - Sono state generate metriche di valutazione come il classification report, la matrice di confusione, F1 score, recall e precision. 
-   - Infine viene fatta una stampa con 4 immagine con la label sopra che indica in rosso il nome dell'animale se è sbagliato e in verde se è giusto.
+### Testing e Valutazione
+- Dopo il training, il modello è stato testato su un set di immagini non viste.
+- Sono state generate metriche di valutazione come il classification report, la matrice di confusione, F1 score, recall e precision. 
+- Infine viene fatta una stampa con 4 immagine con la label sopra che indica in rosso il nome dell'animale se è sbagliato e in verde se è giusto.
 
-5. **Visualizzazione con TensorBoard**:
-   - Gli embeddings sono stati registrati e visualizzati utilizzando TensorBoard per esplorare la rappresentazione del modello.
+### Visualizzazione con TensorBoard
+- Gli embeddings sono stati registrati e visualizzati utilizzando TensorBoard per esplorare la rappresentazione del modello.
 
+## Problematiche Riscontrate
 
-### Problematiche Riscontrate
+### Preparazione del Dataset
+- La suddivisione del dataset in set di training e testing è stata una fase critica per garantire la validità dei risultati.
 
-1. **Preparazione del Dataset**:
-   - La suddivisione del dataset in set di training e testing è stata una fase critica per garantire la validità dei risultati.
+### Configurazione dei Modelli
+- L'adattamento dei modelli ResNet50 e AlexNet per il numero variabile di classi è stato un passaggio importante.
+- La scelta dei parametri di training, come la learning rate e il numero di epoche, ha richiesto diversi tentativi per ottenere risultati ottimali.
 
-2. **Configurazione dei Modelli**:
-   - L'adattamento dei modelli ResNet50 e AlexNet per il numero variabile di classi è stato un passaggio importante.
-   - La scelta dei parametri di training, come la learning rate e il numero di epoche, ha richiesto diversi tentativi per ottenere risultati ottimali.
+### Performance del Training
+- La gestione delle risorse computazionali, in particolare l'uso della GPU, è stata essenziale per ridurre i tempi di addestramento.
+- Il monitoraggio e la visualizzazione dei progressi del training tramite TensorBoard sono stati fondamentali per identificare problemi di overfitting o underfitting.
 
-3. **Performance del Training**:
-   - La gestione delle risorse computazionali, in particolare l'uso della GPU, è stata essenziale per ridurre i tempi di addestramento.
-   - Il monitoraggio e la visualizzazione dei progressi del training tramite TensorBoard sono stati fondamentali per identificare problemi di overfitting o underfitting.
+### Automazione degli esperimenti
+- E' stato difficile scegliere i parametri giusti per fare esperimenti rilevanti come per esempio il numero di epoche, il numero di batch e il learning rate.
 
-### Punti Critici
-
+## Punti Critici
 - **Tempo di Addestramento**: L'addestramento del modello ha richiesto un tempo significativo, specialmente con dataset di grandi dimensioni.
 - **Gestione della Memoria**: L'utilizzo della GPU ha migliorato le performance, ma ha richiesto attenzione nella gestione della memoria per evitare out-of-memory errors.
 - **Registrazione degli Embeddings**: La registrazione e la visualizzazione degli embeddings hanno richiesto un'attenta configurazione di TensorBoard.
 
 ## Risultato Atteso
-
 L'obiettivo era ottenere un modello di classificazione accurato, in grado di distinguere tra diverse razze di cani e gatti con un'alta precisione. La visualizzazione degli embeddings tramite TensorBoard doveva fornire un insight aggiuntivo sulla rappresentazione appresa dal modello.
 
-### Risultati Ottenuti
-
-- Il modello ha raggiunto una buona accuratezza di classificazione, con metriche di valutazione soddisfacenti.
+## Risultati Ottenuti
+- Il modello ha raggiunto una buona accuratezza di classificazione (88%), con metriche di valutazione soddisfacenti.
 - La visualizzazione degli embeddings su TensorBoard ha mostrato che il modello ha effettivamente appreso rappresentazioni utili per distinguere tra le diverse classi.
 
 ## Grafici e Visualizzazioni
 
 ### 1. Training Loss e Accuracy
-
-![Training Loss e Accuracy](path/to/training_loss_accuracy.png)
+Da mettere immagini
 
 ### 2. Classification Report
-
-Da mettere immagine
+Da mettere immagini
 
 ### 3. Confusion Matrix
-
 La matrice di confusione fornisce una rappresentazione visiva degli errori di classificazione commessi dal modello. Ogni riga rappresenta le istanze di una classe predetta mentre ogni colonna rappresenta le istanze della classe reale.
 
-Da mettere immagine
+Da mettere immagini
 
 Nella matrice di confusione:
 - Gli elementi sulla diagonale rappresentano il numero di istanze correttamente classificate per ciascuna classe.
 - Gli elementi fuori dalla diagonale rappresentano le istanze mal classificate.
 
-### Visualizzazione degli Embeddings
+### 4. Projector
+
+Da mettere immagini
+
+## Esperimenti
+
+Cliccando il tasto "Run Experiments" è possibile avviare una serie di esperimenti che testano diverse configurazioni del modello di rete neurale. Durante questi esperimenti, vengono variati parametri come il numero di epoche, il learning rate, la dimensione del batch e la dimensione del dataset. I risultati, inclusi la loss e l'accuratezza, vengono registrati e visualizzati utilizzando TensorBoard. Questo processo aiuta a identificare la configurazione ottimale degli iperparametri per massimizzare le prestazioni del modello.  
+
+Da mettere immagini
+
+## Visualizzazione degli Embeddings
 
 L'utilizzo di TensorBoard per visualizzare gli embeddings fornisce un insight visivo su come il modello rappresenta le diverse classi. Gli embeddings proiettati in uno spazio a bassa dimensione (usando tecniche come PCA o t-SNE) possono mostrare cluster distinti per ciascuna classe.
 
 Da mettere immagine
 
+## Considerazioni Finali
 
-## Considerazioni finali
+Purtroppo non siamo riusciti ad arrivare alla perfezione del 100% di accuratezza, però esperimentando sul numero di epoche, la dimensione del batch e altri iperparametri stiamo riuscendo a trovare la configurazione ottimale. Inoltre potrebbero portare a un miglioramento significativo l'utilizzo di tecniche di data augmentation per arricchire il dataset e rendere il modello più robusto.
 
+### Grafico dei vari layer del progetto:
 
-
-
+Da mettere immagine grafo
