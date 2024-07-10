@@ -207,13 +207,13 @@ class App:
         ]
         self.train_button.config(state=tk.DISABLED)
         self.test_button.config(state=tk.DISABLED)
+        self.experiment_button.config(state=tk.DISABLED)
         self.stop_button.config(state=tk.NORMAL)
         
         self.training_manager.start_training_thread(
-            self.selected_classes, self.selected_model_type, self.selected_animal_type
+            self.selected_classes, self.selected_model_type, self.selected_animal_type, self
         )
-        # self.train_button.config(state=tk.NORMAL)
-        # self.stop_button.config(state=tk.DISABLED)
+        
 
     def start_testing(self):
         self.selected_classes = [
@@ -221,9 +221,11 @@ class App:
         ]
         self.test_button.config(state=tk.DISABLED)
         self.train_button.config(state=tk.DISABLED)
+        self.experiment_button.config(state=tk.DISABLED)
+        self.stop_button.config(state=tk.DISABLED)
         
         self.training_manager.start_testing_thread(
-            self.selected_classes, self.selected_model_type
+            self.selected_classes, self.selected_model_type, self
         )
         
     def start_experiment(self):
@@ -300,6 +302,10 @@ class App:
         if os.path.exists(os.path.join(self.animal_dir, self.checkpoint_path)):
             self.resume_button.config(state=tk.NORMAL)
             self.train_button.config(state=tk.DISABLED)
+            self.test_button.config(state=tk.DISABLED)
+            self.experiment_button.config(state=tk.DISABLED)
+            self.update_log("A previous chekpoint.pt was found, please resume the training")
+
         else:
             self.resume_button.config(state=tk.DISABLED)
 

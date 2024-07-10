@@ -1,6 +1,7 @@
 import os
 import threading
 import torch
+import tkinter as tk
 from tkinter import messagebox, filedialog
 from DataLoaderHelper import DataLoaderHelper
 from model_factory import ModelFactory
@@ -22,7 +23,7 @@ class TrainingManager:
         self.selected_model_type = None
         self.selected_classes = []
 
-    def train_model(self, resume=False):
+    def train_model(self, app = None, resume=False):
       # Preparazione per il training
         self.update_log(
             "Training started with selected classes... ({})".format(
@@ -65,15 +66,26 @@ class TrainingManager:
         
         self.trained_model = self.trainer.train(start_epoch=start_epoch)
 
-        self.update_log("Training completed.")
+        if resume:
+            self.update_log("Restart the app to resume your training")
+            app.train_button.config(state=tk.DISABLED)
+            app.test_button.config(state=tk.DISABLED)
+            app.experiment_button.config(state=tk.DISABLED)
+            app.stop_button.config(state=tk.DISABLED)
+        else:
+            self.update_log("Training completed.\n\nYou can continue by testing the trained model")
+            app.train_button.config(state=tk.DISABLED)
+            app.test_button.config(state=tk.NORMAL)
+            app.experiment_button.config(state=tk.NORMAL)
+            app.stop_button.config(state=tk.DISABLED)
 
-    def test_model(self):
+    def test_model(self, app):
         """Test the trained model."""
         if not self.trained_model:
             if messagebox.askyesno(
                 "Model not found",
                 "No trained model found. Do you want to load a saved model?",
-            ):
+                ):
                 model_path = filedialog.askopenfilename(
                     filetypes=[("PyTorch models", "*.pt")]
                 )
@@ -81,9 +93,17 @@ class TrainingManager:
                     self.load_model(model_path)
                 else:
                     self.update_log("Model loading cancelled.")
+                    app.train_button.config(state=tk.NORMAL)
+                    app.test_button.config(state=tk.NORMAL)
+                    app.experiment_button.config(state=tk.NORMAL)
+                    app.stop_button.config(state=tk.NORMAL)
                     return
             else:
-                self.update_log("Please train the model first.")
+                self.update_log("Choose or train a model first.")
+                app.train_button.config(state=tk.NORMAL)
+                app.test_button.config(state=tk.NORMAL)
+                app.experiment_button.config(state=tk.NORMAL)
+                app.stop_button.config(state=tk.NORMAL)
                 return
 
         self.update_log(
@@ -105,6 +125,8 @@ class TrainingManager:
 
         accuracy, all_preds, all_labels = tester.test()
         self.update_log(f"Test Accuracy: {accuracy:.4f}")
+        app.train_button.config(state=tk.NORMAL)
+        app.experiment_button.config(state=tk.NORMAL)
 
     def load_model(self, model_path=""):
         n_classes = len(self.selected_classes)
@@ -124,30 +146,38 @@ class TrainingManager:
         
         return model, optimizer
 
-    def start_training_thread(self, selected_classes, selected_model_type, selected_animal_type):
+    def start_training_thread(self, selected_classes, selected_model_type, selected_animal_type, app):
         self.selected_classes = selected_classes
         self.selected_model_type = selected_model_type
         self.selected_animal_type = selected_animal_type
         self.phase = "Train"
         if not self.selected_classes:
             messagebox.showerror("Error", "No classes selected")
+            app.train_button.config(state=tk.NORMAL)
+            app.test_button.config(state=tk.NORMAL)
+            app.experiment_button.config(state=tk.NORMAL)
+            app.stop_button.config(state=tk.DISABLED)
             return
         print("Selected classes:", self.selected_classes)
 
-        self.training_thread = threading.Thread(target=self.train_model, daemon=True)
+        self.training_thread = threading.Thread(target=lambda:self.train_model(app), daemon=True)
         self.training_thread.start()
 
-    def start_testing_thread(self, selected_classes, selected_model_type):
+    def start_testing_thread(self, selected_classes, selected_model_type, app):
         self.selected_classes = selected_classes
         self.selected_model_type = selected_model_type
         self.phase = "Test"
 
         if not self.selected_classes:
             messagebox.showerror("Error", "No classes selected")
+            app.test_button.config(state=tk.NORMAL)
+            app.train_button.config(state=tk.NORMAL)
+            app.experiment_button.config(state=tk.NORMAL)
+            app.stop_button.config(state=tk.DISABLED)
             return
         print("Selected classes:", self.selected_classes)
         
-        self.testing_thread = threading.Thread(target=self.test_model, daemon=True)
+        self.testing_thread = threading.Thread(target=lambda:self.test_model(app), daemon=True)
         self.testing_thread.start()
 
 
@@ -212,4 +242,5 @@ class TrainingManager:
     def stop_training(self):
         """Stop the training thread."""
         if self.training_thread.is_alive():
+            messagebox.showinfo("STOP TRAINING", "Training will be stopped at the beginning of next epoch")
             self.trainer.stop()
