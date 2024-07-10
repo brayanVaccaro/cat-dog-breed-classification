@@ -201,7 +201,7 @@ class TrainingManager:
         for epochs in exp_epochs:
             for lr in exp_lrs:
                 for batch_size in exp_batch_sizes:
-                    model = self.load_model()
+                    model, _ = self.load_model()
                     experiment.setup_experiment(
                         num_epochs=epochs, l_rate=lr, batch_size=batch_size, model=model
                     )
