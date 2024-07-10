@@ -25,6 +25,7 @@ class DataLoaderHelper:
                     v2.ToImage(),
                     v2.ToDtype(torch.float32, scale=True),
                     v2.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                    # v2.Normalize([0.4762, 0.4438, 0.3938], [0.2264, 0.2230, 0.2248]),
                 ]
             ),
             "val": v2.Compose(
@@ -32,6 +33,7 @@ class DataLoaderHelper:
                     v2.Resize(size=(224, 224)),
                     v2.ToDtype(torch.float32, scale=True),
                     v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                    # v2.Normalize([0.4762, 0.4438, 0.3938], [0.2264, 0.2230, 0.2248]),
                 ]
             ),
             "test": v2.Compose(
@@ -122,7 +124,7 @@ class DataLoaderHelper:
     def split_dataset(self, selected_indices, updated_labels):
 
         train_indices, val_indices = train_test_split(
-            selected_indices, test_size=0.2, stratify=updated_labels, random_state=42
+            selected_indices, test_size=self.config['test_size'], stratify=updated_labels, random_state=None
         )
 
         train_labels = [
